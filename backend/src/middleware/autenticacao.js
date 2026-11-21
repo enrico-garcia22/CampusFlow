@@ -13,11 +13,13 @@ export async function exigirLogin(req, _res, next) {
       throw new ErroHttp(401, 'Token inválido ou expirado.');
     }
     const [usuarios] = await pool.execute(`
-      SELECT id, nome_completo, nome_usuario, email, ra, telefone, perfil
+      SELECT id, nome_completo, nome_usuario, email, ra, ra_indice, telefone, perfil
       FROM usuarios WHERE id = ?
     `, [payload.sub]);
     if (usuarios.length === 0) throw new ErroHttp(401, 'Usuário não encontrado.');
-    req.usuario = usuarios[0];
+    // O hash é usado apenas internamente ao criar a reserva.
+    req.usuario = { ...usuarios[0], ra_hash: usuarios[0].ra };
+    delete req.usuario.ra;
     next();
   } catch (erro) { next(erro); }
 }

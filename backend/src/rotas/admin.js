@@ -13,7 +13,7 @@ adminRouter.get('/reservas', async (_req, res) => {
   await atualizarStatusReservas();
   const [linhas] = await pool.execute(`
     SELECT r.id, r.sala_id, s.nome AS sala_nome, r.usuario_id,
-           u.email AS responsavel_email, r.responsavel_nome, r.responsavel_ra,
+           u.email AS responsavel_email, r.responsavel_nome,
            r.responsavel_telefone, r.inicio_utc, r.fim_utc, r.qtd_pessoas,
            r.titulo, r.descricao, r.nomes_participantes, r.status
     FROM reservas r

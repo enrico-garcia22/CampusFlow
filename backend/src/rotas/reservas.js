@@ -73,7 +73,7 @@ reservasRouter.post('/', async (req, res) => {
       throw new ErroHttp(409, 'Já existe reserva para essa sala nesse intervalo. Escolha outro horário ou sala.');
     }
 
-    // Nome, RA e telefone vêm do usuário autenticado, não de campos manipuláveis.
+    // Nome/telefone são obtidos da sessão. O RA só é copiado como hash irreversível.
     const [resultado] = await conexao.execute(`
       INSERT INTO reservas (
         usuario_id, sala_id, inicio_utc, fim_utc, qtd_pessoas,
@@ -81,7 +81,7 @@ reservasRouter.post('/', async (req, res) => {
         titulo, descricao, nomes_participantes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [req.usuario.id, salaId, paraSqlUtc(dataInicio), paraSqlUtc(dataFim), pessoas,
-        req.usuario.nome_completo, req.usuario.ra, req.usuario.telefone,
+        req.usuario.nome_completo, req.usuario.ra_hash, req.usuario.telefone,
         titulo, descricao, nomes]);
     await conexao.commit();
     res.status(201).json({

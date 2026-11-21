@@ -14,7 +14,7 @@ Content-Type: application/json
   "nome_completo": "Estudante Demonstração",
   "nome_usuario": "aluno_teste",
   "email": "aluno.teste@example.com",
-  "ra": "20260001",
+  "ra": "202600001",
   "telefone": "(15) 99999-9999",
   "senha": "senhaDeTeste123"
 }
