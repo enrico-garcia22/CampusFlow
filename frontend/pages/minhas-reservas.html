@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#172554">
+<title>Minhas reservas | CampusFlow</title><link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/variables.css"><link rel="stylesheet" href="../assets/css/global.css"><link rel="stylesheet" href="../assets/css/components.css"><link rel="stylesheet" href="../assets/css/responsive.css">
+<script defer src="../assets/js/api.js"></script><script defer src="../assets/js/app.js"></script><script defer src="../assets/js/reservas-utils.js"></script><script defer src="../assets/js/minhas-reservas.js"></script></head>
+<body data-page="minhas-reservas"><a class="skip-link" href="#conteudo">Pular para o conteúdo</a><div class="app-shell"><div id="sidebarMount"></div><div class="app-main"><div id="topbarMount"></div>
+<main class="page-content" id="conteudo"><section class="page-heading"><div><span class="eyebrow">ACOMPANHAMENTO</span><h1>Minhas reservas</h1><p>Consulte seus agendamentos reais e cancele reservas futuras.</p></div><a class="btn btn-primary" href="reservar-sala.html">+ Nova reserva</a></section>
+<div class="info-banner mb-18"><span class="banner-bubble" aria-hidden="true">i</span><p>O histórico é carregado do MariaDB e preserva registros cancelados e expirados. A confirmação de presença por QR Code será adicionada posteriormente.</p></div>
+<div class="booking-toolbar"><div class="filters-mini"><div class="field"><label for="reservationSearch">Buscar reserva</label><input id="reservationSearch" type="search" placeholder="Nome da sala ou atividade…"></div>
+<div class="field"><label for="statusFilter">Situação</label><select id="statusFilter"><option value="">Todas</option><option value="confirmada">Confirmadas</option><option value="em_uso">Em uso</option><option value="concluida">Concluídas</option><option value="expirada">Expiradas</option><option value="cancelada">Canceladas</option></select></div></div><button id="refreshBookings" type="button" class="btn btn-quiet btn-sm">Atualizar histórico</button></div>
+<p class="muted small" id="reservationCount" aria-live="polite">Carregando reservas…</p><p class="form-error" id="historyError" role="alert" hidden></p>
+<section id="bookingList" class="booking-list" aria-label="Reservas do usuário"></section>
+<dialog class="dialog" id="confirmDialog" aria-labelledby="confirmTitle"><h2 id="confirmTitle">Cancelar reserva</h2><p>Deseja cancelar esta reserva? O horário será liberado para outros estudantes. O registro permanecerá no histórico.</p><div class="dialog-actions"><button type="button" id="dismissAction" class="btn btn-outline">Voltar</button><button type="button" id="confirmAction" class="btn btn-danger">Confirmar cancelamento</button></div></dialog>
+</main><div id="footerMount"></div></div></div></body></html>
