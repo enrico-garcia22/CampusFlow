@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172554"><title>Reservar sala | CampusFlow</title>
+  <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/css/variables.css"><link rel="stylesheet" href="../assets/css/global.css">
+  <link rel="stylesheet" href="../assets/css/components.css"><link rel="stylesheet" href="../assets/css/responsive.css">
+  <script defer src="../assets/js/api.js"></script><script defer src="../assets/js/app.js"></script>
+  <script defer src="../assets/js/reservas-utils.js"></script><script defer src="../assets/js/reserva.js"></script>
+</head>
+<body data-page="reservar-sala"><a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+<div class="app-shell"><div id="sidebarMount"></div><div class="app-main"><div id="topbarMount"></div>
+<main class="page-content" id="conteudo">
+  <section class="page-heading"><div><span class="eyebrow">AGENDAMENTO DE ESPAÇOS</span><h1>Reservar uma sala</h1><p>Escolha uma sala, a quantidade de participantes e o período da atividade.</p></div><a class="btn btn-outline" href="salas.html">← Voltar às salas</a></section>
+  <div class="info-banner mb-18"><span class="banner-bubble" aria-hidden="true">i</span><p><strong>Reserva real no sistema de demonstração.</strong> Os registros são salvos no MariaDB. Por enquanto, e-mails e QR Codes não são enviados. O RA não precisa ser digitado novamente: ele já está protegido na conta.</p></div>
+  <div class="booking-layout">
+    <section class="panel" aria-labelledby="bookingFormTitle">
+      <div class="panel-heading"><div><h2 id="bookingFormTitle">Dados da reserva</h2><p>Campos marcados com * são obrigatórios.</p></div></div>
+      <form id="bookingForm" class="form-grid">
+        <div class="field"><label for="sala">Sala desejada *</label><select id="sala" name="sala_id" required><option value="">Carregando salas…</option></select></div>
+        <div class="field"><label>Responsável autenticado</label><p id="responsavelDados" class="muted small" aria-live="polite">Carregando seus dados…</p><span class="form-hint">Nome, telefone e RA protegido são associados à reserva no servidor.</span></div>
+        <div class="form-row">
+          <div class="field"><label for="data">Data da reserva *</label><input id="data" name="data" type="date" required></div>
+          <div class="field"><label for="pessoas">Quantidade de participantes *</label><input id="pessoas" name="pessoas" type="number" min="1" step="1" placeholder="Ex.: 12" required></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="horaInicio">Horário de início *</label><select id="horaInicio" required><option value="">Selecione uma sala</option></select></div>
+          <div class="field"><label for="horaFim">Horário de término *</label><select id="horaFim" required><option value="">Selecione uma sala</option></select></div>
+        </div>
+        <div class="field"><label for="titulo">Título da atividade (opcional)</label><input id="titulo" name="titulo" type="text" maxlength="150" placeholder="Ex.: Grupo de estudos"></div>
+        <div class="field"><label for="descricao">Descrição (opcional)</label><textarea id="descricao" name="descricao" maxlength="3000" placeholder="Objetivo da atividade e observações…"></textarea></div>
+        <div class="field"><label for="nomesParticipantes">Nomes dos participantes (opcional)</label><textarea id="nomesParticipantes" name="nomes_participantes" maxlength="3000" placeholder="Se desejar, informe os nomes dos participantes."></textarea></div>
+        <p class="form-error" id="bookingFeedback" role="alert" aria-live="assertive"></p>
+        <div class="form-actions"><button type="button" id="checkRecomendacao" class="btn btn-outline">Ver salas recomendadas</button><button type="submit" id="submitReserva" class="btn btn-primary">Confirmar reserva →</button></div>
+      </form>
+      <div id="recomendacoes" class="mt-18" aria-live="polite" hidden></div>
+    </section>
+    <aside class="panel booking-aside" aria-label="Informações da sala selecionada"><span class="eyebrow">SOBRE O ESPAÇO</span><div id="roomPreview"><h2>Escolha uma sala</h2></div><div class="info-banner booking-status"><span class="banner-bubble" aria-hidden="true">i</span><p>O servidor verifica os horários, a capacidade e eventuais conflitos ao confirmar. A recomendação não mantém a sala bloqueada.</p></div></aside>
+  </div>
+</main><div id="footerMount"></div></div></div></body></html>

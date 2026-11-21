@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CampusFlow — Salas disponíveis. Protótipo demonstrativo para o Trabalho em Grupo SCOM.">
+  <meta name="theme-color" content="#172554">
+  <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+  <title>Salas disponíveis | CampusFlow</title>
+  <link rel="stylesheet" href="../assets/css/variables.css">
+  <link rel="stylesheet" href="../assets/css/global.css">
+  <link rel="stylesheet" href="../assets/css/components.css">
+  <link rel="stylesheet" href="../assets/css/responsive.css">
+  <script defer src="../assets/js/api.js"></script>
+  <script defer src="../assets/js/app.js"></script>
+  <script defer src="../assets/js/salas.js"></script>
+</head>
+<body data-page="salas">
+  <a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+  <div class="app-shell">
+    <div id="sidebarMount"></div>
+    <div class="app-main">
+      <div id="topbarMount"></div>
+      <main class="page-content" id="conteudo">
+<section class="page-heading"><div><span class="eyebrow">CATÁLOGO DE ESPAÇOS</span><h1>Encontre a sala ideal</h1><p>Consulte salas cadastradas, capacidade e horários diretamente no banco de dados.</p></div><a class="btn btn-primary" href="reservar-sala.html">+ Nova reserva</a></section>
+<div id="reservaSuccess" class="info-banner mb-18" role="status" hidden><span class="banner-bubble" aria-hidden="true">✓</span><p data-reserva-confirmacao></p></div>
+<div class="info-banner mb-18"><span class="banner-bubble" aria-hidden="true">i</span><p>Salas e estados atuais são carregados da API. O indicador “livre agora” não garante disponibilidade em um horário futuro.</p></div>
+<section class="panel filter-panel" aria-labelledby="filterHeading"><h2 id="filterHeading" class="sr-only">Buscar e filtrar salas</h2>
+  <div class="filters">
+    <div class="field"><label for="roomSearch">Pesquisar</label><input id="roomSearch" type="search" placeholder="Nome ou prédio…"></div>
+    <div class="field"><label for="buildingFilter">Prédio</label><select id="buildingFilter"><option value="">Todos os prédios</option></select></div>
+
+    <div class="field"><label for="capacityFilter">Capacidade mínima</label><select id="capacityFilter"><option value="">Qualquer</option><option value="20">20 pessoas</option><option value="30">30 pessoas</option><option value="40">40 pessoas</option><option value="100">100 pessoas</option></select></div>
+  </div>
+</section>
+<p class="form-error" id="loadError" role="alert" hidden></p><div class="filter-actions"><span id="roomCount" aria-live="polite">Carregando salas…</span><button id="clearFilters" type="button" class="btn btn-quiet btn-sm">Limpar filtros</button></div>
+<section class="room-grid" id="roomList" aria-label="Resultados da busca"></section>
+      </main>
+      <div id="footerMount"></div>
+    </div>
+  </div>
+</body>
+</html>
