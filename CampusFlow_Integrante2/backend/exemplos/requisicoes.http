@@ -1,0 +1,57 @@
+# Extensão REST Client (VS Code). Alternativamente use Postman.
+# Substitua {{token}} após fazer login e use datas FUTURAS.
+@url = http://localhost:3001
+@token = COLE_O_TOKEN_DO_LOGIN_AQUI
+
+### 1. Verificar conexão
+GET {{url}}/api/health
+
+### 2. Cadastrar aluno
+POST {{url}}/api/auth/cadastro
+Content-Type: application/json
+
+{
+  "nome_completo": "Estudante Demonstração",
+  "nome_usuario": "aluno_teste",
+  "email": "aluno.teste@example.com",
+  "ra": "20260001",
+  "telefone": "(15) 99999-9999",
+  "senha": "senhaDeTeste123"
+}
+
+### 3. Login
+POST {{url}}/api/auth/login
+Content-Type: application/json
+
+{ "nome_usuario": "aluno_teste", "senha": "senhaDeTeste123" }
+
+### 4. Listar salas
+GET {{url}}/api/salas
+Authorization: Bearer {{token}}
+
+### 5. Recomendar sala de 12 pessoas
+GET {{url}}/api/salas/recomendadas?inicio=2026-12-15T14%3A00%3A00-03%3A00&fim=2026-12-15T16%3A00%3A00-03%3A00&pessoas=12
+Authorization: Bearer {{token}}
+
+### 6. Criar reserva (a segunda chamada idêntica deve retornar 409)
+POST {{url}}/api/reservas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sala_id": 1,
+  "inicio": "2026-12-15T14:00:00-03:00",
+  "fim": "2026-12-15T16:00:00-03:00",
+  "pessoas": 12,
+  "titulo": "Grupo de estudos",
+  "descricao": "Revisão de Sistemas Computacionais",
+  "nomes_participantes": "Pessoa A, Pessoa B"
+}
+
+### 7. Listar reservas próprias
+GET {{url}}/api/reservas/minhas
+Authorization: Bearer {{token}}
+
+### 8. Estatísticas (exige perfil admin)
+GET {{url}}/api/admin/estatisticas
+Authorization: Bearer {{token}}
