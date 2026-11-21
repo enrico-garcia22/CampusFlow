@@ -10,14 +10,15 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nome_completo VARCHAR(150) NOT NULL,
   nome_usuario VARCHAR(50) NOT NULL,
   email VARCHAR(190) NOT NULL,
-  ra VARCHAR(30) NOT NULL,
+  ra VARCHAR(100) NOT NULL COMMENT 'Hash bcrypt do RA validado com 9 digitos',
+  ra_indice CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT 'HMAC para unicidade',
   telefone VARCHAR(30) NOT NULL,
   senha_hash VARCHAR(255) NOT NULL,
   perfil ENUM('aluno', 'admin') NOT NULL DEFAULT 'aluno',
   criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_usuarios_nome_usuario (nome_usuario),
   UNIQUE KEY uq_usuarios_email (email),
-  UNIQUE KEY uq_usuarios_ra (ra)
+  UNIQUE KEY uq_usuarios_ra_indice (ra_indice)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS salas (
@@ -41,7 +42,7 @@ CREATE TABLE IF NOT EXISTS reservas (
   fim_utc DATETIME NOT NULL,
   qtd_pessoas SMALLINT UNSIGNED NOT NULL,
   responsavel_nome VARCHAR(150) NOT NULL,
-  responsavel_ra VARCHAR(30) NOT NULL,
+  responsavel_ra VARCHAR(100) NOT NULL COMMENT 'Copia do hash bcrypt do usuario na reserva',
   responsavel_telefone VARCHAR(30) NOT NULL,
   titulo VARCHAR(150) NULL,
   descricao TEXT NULL,

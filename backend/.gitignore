@@ -2,3 +2,6 @@ node_modules/
 .env
 *.log
 .DS_Store
+
+# Mapeamentos locais de RAs para migração
+ra-migracao*.json
