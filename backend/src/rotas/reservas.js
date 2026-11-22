@@ -1,14 +1,13 @@
 import { Router } from 'express';
 import { pool } from '../config/db.js';
-import { exigirLogin } from '../middleware/autenticacao.js';
+import { exigirLogin, loginOpcional } from '../middleware/autenticacao.js';
 import { atualizarStatusReservas } from '../services/statusReservas.js';
 import { validarPeriodo, dentroDoHorarioSala, paraSqlUtc, sqlUtcParaIso } from '../utils/datas.js';
 import { ErroHttp } from '../utils/erros.js';
-import { gerarTokenReserva, hashTokenQr, gerarQrCodeSvg, gerarQrCodeDataUri } from '../utils/qrcode.js';
+import { gerarTokenReserva, hashTokenQr, gerarQrCodeSvg, gerarQrCodeDataUri, obterIpLocal } from '../utils/qrcode.js';
 import { notificarReservaCriada } from '../services/emailService.js';
 
 export const reservasRouter = Router();
-reservasRouter.use(exigirLogin);
 
 function textoOpcional(valor, tamanhoMaximo, campo) {
   if (valor == null || valor === '') return null;
@@ -18,102 +17,37 @@ function textoOpcional(valor, tamanhoMaximo, campo) {
   return valor.trim() || null;
 }
 
-// GET /api/reservas/minhas - histórico do usuário, inclusive canceladas/expiradas.
-reservasRouter.get('/minhas', async (req, res) => {
-  await atualizarStatusReservas();
-  const [linhas] = await pool.execute(`
-    SELECT r.id, r.sala_id, s.nome AS sala_nome, s.predio, s.capacidade,
-           r.inicio_utc, r.fim_utc, r.qtd_pessoas, r.titulo, r.descricao,
-           r.nomes_participantes, r.status, r.qr_token_hash, r.criado_em,
-           (SELECT COUNT(*) FROM presencas p WHERE p.reserva_id = r.id) AS total_presentes
-    FROM reservas r JOIN salas s ON s.id = r.sala_id
-    WHERE r.usuario_id = ? ORDER BY r.inicio_utc DESC
-  `, [req.usuario.id]).catch(async (e) => {
-    // Fallback caso a tabela presencas ainda não exista na instância do MariaDB
-    if (e.code === 'ER_NO_SUCH_TABLE') {
-      return pool.execute(`
-        SELECT r.id, r.sala_id, s.nome AS sala_nome, s.predio, s.capacidade,
-               r.inicio_utc, r.fim_utc, r.qtd_pessoas, r.titulo, r.descricao,
-               r.nomes_participantes, r.status, r.qr_token_hash, r.criado_em,
-               0 AS total_presentes
-        FROM reservas r JOIN salas s ON s.id = r.sala_id
-        WHERE r.usuario_id = ? ORDER BY r.inicio_utc DESC
-      `, [req.usuario.id]);
-    }
-    throw e;
-  });
-
-  res.json({ reservas: linhas.map((r) => ({
-    ...r,
-    inicio: sqlUtcParaIso(r.inicio_utc),
-    fim: sqlUtcParaIso(r.fim_utc),
-    tem_qr: Boolean(r.qr_token_hash),
-    total_presentes: Number(r.total_presentes ?? 0),
-    inicio_utc: undefined, fim_utc: undefined, qr_token_hash: undefined,
-  })) });
-});
-
-// GET /api/reservas/:id/qrcode - obtém o QR Code e detalhes para projeção/leitura
-reservasRouter.get('/:id/qrcode', async (req, res) => {
-  const reservaId = Number(req.params.id);
-  if (!Number.isInteger(reservaId) || reservaId < 1) throw new ErroHttp(422, 'Reserva inválida.');
-
-  await atualizarStatusReservas();
-  const [linhas] = await pool.execute(`
-    SELECT r.id, r.sala_id, s.nome AS sala_nome, s.predio, s.capacidade,
-           r.usuario_id, r.inicio_utc, r.fim_utc, r.qtd_pessoas, r.titulo,
-           r.status, r.qr_token_hash, r.confirmado_em_utc
-    FROM reservas r
-    JOIN salas s ON s.id = r.sala_id
-    WHERE r.id = ?
-  `, [reservaId]);
-
-  if (!linhas.length) throw new ErroHttp(404, 'Reserva não encontrada.');
-  const r = linhas[0];
-  const ehDono = req.usuario.id === r.usuario_id;
-  const ehAdmin = req.usuario.perfil === 'admin';
-  if (!ehDono && !ehAdmin) {
-    throw new ErroHttp(403, 'Apenas o titular da reserva ou administrador pode visualizar o QR Code.');
+/**
+ * Retorna a URL base do frontend para montar links de check-in que funcionem
+ * tanto no localhost quanto ao escanear com a câmera do celular na mesma rede Wi-Fi.
+ */
+function obterFrontendBase(req) {
+  if (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost')) {
+    return process.env.FRONTEND_URL.replace(/\/+$/, '');
   }
+  const host = req?.headers?.host;
+  if (host && !host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
+    const hostname = host.split(':')[0];
+    return `http://${hostname}/CampusFlow/frontend`;
+  }
+  const ipLocal = obterIpLocal();
+  if (ipLocal && ipLocal !== '127.0.0.1') {
+    return `http://${ipLocal}/CampusFlow/frontend`;
+  }
+  return (process.env.FRONTEND_URL || 'http://localhost/CampusFlow/frontend').replace(/\/+$/, '');
+}
 
-  const [presencas] = await pool.execute(`
-    SELECT COUNT(*) AS total FROM presencas WHERE reserva_id = ?
-  `, [reservaId]).catch(() => [[{ total: 0 }]]);
+// =========================================================================
+// ROTA PÚBLICA DE CHECK-IN: NÃO exige login obrigatório (loginOpcional)
+// Permite que qualquer aluno valide presença apontando a câmera do celular
+// =========================================================================
 
-  const totalPresentes = Number(presencas[0]?.total ?? 0);
-
-  const token = gerarTokenReserva({
-    usuarioId: r.usuario_id,
-    salaId: r.sala_id,
-    inicioUtc: r.inicio_utc,
-    fimUtc: r.fim_utc,
-  });
-
-  const frontendBase = process.env.FRONTEND_URL || 'http://localhost/CampusFlow/frontend';
-  const checkinUrl = `${frontendBase}/pages/checkin.html?token=${encodeURIComponent(token)}`;
-  const qrSvg = gerarQrCodeSvg(checkinUrl, { tamanho: 280 });
-  const qrDataUri = gerarQrCodeDataUri(checkinUrl, { tamanho: 280 });
-
-  res.json({
-    reserva_id: r.id,
-    sala: { id: r.sala_id, nome: r.sala_nome, predio: r.predio, capacidade: r.capacidade },
-    inicio: sqlUtcParaIso(r.inicio_utc),
-    fim: sqlUtcParaIso(r.fim_utc),
-    status: r.status,
-    participantes_estimados: r.qtd_pessoas,
-    participantes_presentes: totalPresentes,
-    taxa_presenca_estimada_percentual: r.qtd_pessoas > 0 ? Math.round((totalPresentes / r.qtd_pessoas) * 100) : null,
-    taxa_ocupacao_sala_percentual: r.capacidade > 0 ? Math.round((totalPresentes / r.capacidade) * 100) : null,
-    checkin_url: checkinUrl,
-    qr_svg: qrSvg,
-    qr_data_uri: qrDataUri,
-  });
-});
-
-// POST /api/reservas/checkin - validação do QR Code e registro de presenças
-reservasRouter.post('/checkin', async (req, res) => {
+reservasRouter.post('/checkin', loginOpcional, async (req, res) => {
   const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
   if (!token) throw new ErroHttp(422, 'Token de QR Code não informado.');
+
+  const anonId = typeof req.body?.anon_id === 'string' ? req.body.anon_id.trim() : null;
+  const nomeInformado = typeof req.body?.nome === 'string' ? req.body.nome.trim() : null;
 
   const tokenHash = hashTokenQr(token);
   await atualizarStatusReservas();
@@ -170,40 +104,71 @@ reservasRouter.post('/checkin', async (req, res) => {
         WHERE id = ?
       `, [r.id]);
 
+      // Se o validador não estiver autenticado, registra o organizador da sala como referência
+      const validadorId = req.usuario ? req.usuario.id : r.usuario_id;
       await conexao.execute(`
         INSERT INTO checkins (reserva_id, validado_por_usuario_id, registrado_em_utc, metodo)
         VALUES (?, ?, UTC_TIMESTAMP(), 'qr')
         ON DUPLICATE KEY UPDATE registrado_em_utc = registrado_em_utc
-      `, [r.id, req.usuario.id]);
+      `, [r.id, validadorId]);
 
       primeiroCheckin = true;
     }
 
-    // Registra presença do participante
+    // Garante compatibilidade da tabela presencas para registros anônimos
     await conexao.execute(`
-      INSERT INTO presencas (reserva_id, usuario_id, registrado_em_utc)
-      VALUES (?, ?, UTC_TIMESTAMP())
-      ON DUPLICATE KEY UPDATE registrado_em_utc = registrado_em_utc
-    `, [r.id, req.usuario.id]).catch(async (e) => {
-      if (e.code === 'ER_NO_SUCH_TABLE') {
-        await conexao.execute(`
-          CREATE TABLE IF NOT EXISTS presencas (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            reserva_id INT UNSIGNED NOT NULL,
-            usuario_id INT UNSIGNED NOT NULL,
-            registrado_em_utc DATETIME NOT NULL,
-            UNIQUE KEY uq_presencas_reserva_usuario (reserva_id, usuario_id)
-          ) ENGINE=InnoDB
-        `);
-        await conexao.execute(`
-          INSERT INTO presencas (reserva_id, usuario_id, registrado_em_utc)
-          VALUES (?, ?, UTC_TIMESTAMP())
-          ON DUPLICATE KEY UPDATE registrado_em_utc = registrado_em_utc
-        `, [r.id, req.usuario.id]);
-      } else {
-        throw e;
+      CREATE TABLE IF NOT EXISTS presencas (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        reserva_id INT UNSIGNED NOT NULL,
+        usuario_id INT UNSIGNED NULL,
+        dispositivo_hash VARCHAR(64) NULL,
+        nome_informado VARCHAR(150) NULL,
+        registrado_em_utc DATETIME NOT NULL,
+        UNIQUE KEY uq_presencas_reserva_usuario (reserva_id, usuario_id),
+        KEY idx_presencas_reserva (reserva_id)
+      ) ENGINE=InnoDB
+    `).catch(() => {});
+
+    await conexao.execute(`
+      ALTER TABLE presencas MODIFY COLUMN usuario_id INT UNSIGNED NULL
+    `).catch(() => {});
+    await conexao.execute(`
+      ALTER TABLE presencas ADD COLUMN dispositivo_hash VARCHAR(64) NULL AFTER usuario_id
+    `).catch(() => {});
+    await conexao.execute(`
+      ALTER TABLE presencas ADD COLUMN nome_informado VARCHAR(150) NULL AFTER dispositivo_hash
+    `).catch(() => {});
+
+    // Registra presença do aluno (autenticado ou anônimo via câmera do celular)
+    if (req.usuario) {
+      await conexao.execute(`
+        INSERT INTO presencas (reserva_id, usuario_id, dispositivo_hash, nome_informado, registrado_em_utc)
+        VALUES (?, ?, ?, ?, UTC_TIMESTAMP())
+        ON DUPLICATE KEY UPDATE registrado_em_utc = registrado_em_utc
+      `, [r.id, req.usuario.id, anonId || null, req.usuario.nome_completo || null]);
+    } else {
+      let jaPresente = false;
+      if (anonId) {
+        const [existentes] = await conexao.execute(`
+          SELECT id FROM presencas WHERE reserva_id = ? AND dispositivo_hash = ? LIMIT 1
+        `, [r.id, anonId]).catch(() => [[]]);
+        if (existentes.length > 0) jaPresente = true;
       }
-    });
+
+      if (!jaPresente) {
+        await conexao.execute(`
+          INSERT INTO presencas (reserva_id, usuario_id, dispositivo_hash, nome_informado, registrado_em_utc)
+          VALUES (?, NULL, ?, ?, UTC_TIMESTAMP())
+        `, [r.id, anonId || null, nomeInformado || 'Participante (Câmera)']).catch(async () => {
+          // Fallback caso usuario_id ainda tenha restrição NOT NULL no banco
+          await conexao.execute(`
+            INSERT INTO presencas (reserva_id, usuario_id, registrado_em_utc)
+            VALUES (?, ?, UTC_TIMESTAMP())
+            ON DUPLICATE KEY UPDATE registrado_em_utc = registrado_em_utc
+          `, [r.id, r.usuario_id]);
+        });
+      }
+    }
 
     const [contagem] = await conexao.execute(`
       SELECT COUNT(*) AS total FROM presencas WHERE reserva_id = ?
@@ -214,8 +179,9 @@ reservasRouter.post('/checkin', async (req, res) => {
     await conexao.commit();
 
     res.json({
+      sucesso: true,
       mensagem: primeiroCheckin
-        ? 'Check-in inicial realizado! A sala está agora em uso e sua presença foi confirmada.'
+        ? 'Check-in realizado! A sala agora está em uso e sua presença foi confirmada.'
         : 'Presença confirmada com sucesso!',
       status: 'em_uso',
       reserva: {
@@ -232,9 +198,13 @@ reservasRouter.post('/checkin', async (req, res) => {
         taxa_ocupacao_sala_percentual: r.capacidade > 0
           ? Math.round((totalPresentes / r.capacidade) * 100) : null,
       },
-      participante: {
+      autenticado: Boolean(req.usuario),
+      participante: req.usuario ? {
         id: req.usuario.id,
         nome: req.usuario.nome_completo,
+        registrado_em: new Date().toISOString(),
+      } : {
+        nome: nomeInformado || 'Participante (Sem login)',
         registrado_em: new Date().toISOString(),
       },
     });
@@ -246,8 +216,103 @@ reservasRouter.post('/checkin', async (req, res) => {
   }
 });
 
-// POST /api/reservas - só confirma depois de uma transação com bloqueio da sala.
-reservasRouter.post('/', async (req, res) => {
+// =========================================================================
+// ROTAS PROTEGIDAS: Exigem login do usuário titular ou administrador
+// =========================================================================
+
+// GET /api/reservas/minhas - histórico do usuário
+reservasRouter.get('/minhas', exigirLogin, async (req, res) => {
+  await atualizarStatusReservas();
+  const [linhas] = await pool.execute(`
+    SELECT r.id, r.sala_id, s.nome AS sala_nome, s.predio, s.capacidade,
+           r.inicio_utc, r.fim_utc, r.qtd_pessoas, r.titulo, r.descricao,
+           r.nomes_participantes, r.status, r.qr_token_hash, r.criado_em,
+           (SELECT COUNT(*) FROM presencas p WHERE p.reserva_id = r.id) AS total_presentes
+    FROM reservas r JOIN salas s ON s.id = r.sala_id
+    WHERE r.usuario_id = ? ORDER BY r.inicio_utc DESC
+  `, [req.usuario.id]).catch(async (e) => {
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return pool.execute(`
+        SELECT r.id, r.sala_id, s.nome AS sala_nome, s.predio, s.capacidade,
+               r.inicio_utc, r.fim_utc, r.qtd_pessoas, r.titulo, r.descricao,
+               r.nomes_participantes, r.status, r.qr_token_hash, r.criado_em,
+               0 AS total_presentes
+        FROM reservas r JOIN salas s ON s.id = r.sala_id
+        WHERE r.usuario_id = ? ORDER BY r.inicio_utc DESC
+      `, [req.usuario.id]);
+    }
+    throw e;
+  });
+
+  res.json({ reservas: linhas.map((r) => ({
+    ...r,
+    inicio: sqlUtcParaIso(r.inicio_utc),
+    fim: sqlUtcParaIso(r.fim_utc),
+    tem_qr: Boolean(r.qr_token_hash),
+    total_presentes: Number(r.total_presentes ?? 0),
+    inicio_utc: undefined, fim_utc: undefined, qr_token_hash: undefined,
+  })) });
+});
+
+// GET /api/reservas/:id/qrcode - obtém o QR Code e detalhes para projeção/leitura
+reservasRouter.get('/:id/qrcode', exigirLogin, async (req, res) => {
+  const reservaId = Number(req.params.id);
+  if (!Number.isInteger(reservaId) || reservaId < 1) throw new ErroHttp(422, 'Reserva inválida.');
+
+  await atualizarStatusReservas();
+  const [linhas] = await pool.execute(`
+    SELECT r.id, r.sala_id, s.nome AS sala_nome, s.predio, s.capacidade,
+           r.usuario_id, r.inicio_utc, r.fim_utc, r.qtd_pessoas, r.titulo,
+           r.status, r.qr_token_hash, r.confirmado_em_utc
+    FROM reservas r
+    JOIN salas s ON s.id = r.sala_id
+    WHERE r.id = ?
+  `, [reservaId]);
+
+  if (!linhas.length) throw new ErroHttp(404, 'Reserva não encontrada.');
+  const r = linhas[0];
+  const ehDono = req.usuario.id === r.usuario_id;
+  const ehAdmin = req.usuario.perfil === 'admin';
+  if (!ehDono && !ehAdmin) {
+    throw new ErroHttp(403, 'Apenas o titular da reserva ou administrador pode visualizar o QR Code.');
+  }
+
+  const [presencas] = await pool.execute(`
+    SELECT COUNT(*) AS total FROM presencas WHERE reserva_id = ?
+  `, [reservaId]).catch(() => [[{ total: 0 }]]);
+
+  const totalPresentes = Number(presencas[0]?.total ?? 0);
+
+  const token = gerarTokenReserva({
+    usuarioId: r.usuario_id,
+    salaId: r.sala_id,
+    inicioUtc: r.inicio_utc,
+    fimUtc: r.fim_utc,
+  });
+
+  const frontendBase = obterFrontendBase(req);
+  const checkinUrl = `${frontendBase}/pages/checkin.html?token=${encodeURIComponent(token)}`;
+  const qrSvg = gerarQrCodeSvg(checkinUrl, { tamanho: 280 });
+  const qrDataUri = gerarQrCodeDataUri(checkinUrl, { tamanho: 280 });
+
+  res.json({
+    reserva_id: r.id,
+    sala: { id: r.sala_id, nome: r.sala_nome, predio: r.predio, capacidade: r.capacidade },
+    inicio: sqlUtcParaIso(r.inicio_utc),
+    fim: sqlUtcParaIso(r.fim_utc),
+    status: r.status,
+    participantes_estimados: r.qtd_pessoas,
+    participantes_presentes: totalPresentes,
+    taxa_presenca_estimada_percentual: r.qtd_pessoas > 0 ? Math.round((totalPresentes / r.qtd_pessoas) * 100) : null,
+    taxa_ocupacao_sala_percentual: r.capacidade > 0 ? Math.round((totalPresentes / r.capacidade) * 100) : null,
+    checkin_url: checkinUrl,
+    qr_svg: qrSvg,
+    qr_data_uri: qrDataUri,
+  });
+});
+
+// POST /api/reservas - criação com bloqueio de concorrência e geração de QR Code
+reservasRouter.post('/', exigirLogin, async (req, res) => {
   const body = req.body ?? {};
   const salaId = Number(body.sala_id);
   const pessoas = Number(body.pessoas);
@@ -262,7 +327,6 @@ reservasRouter.post('/', async (req, res) => {
   const conexao = await pool.getConnection();
   try {
     await conexao.beginTransaction();
-    // O FOR UPDATE serializa reservas concorrentes para esta sala.
     const [salas] = await conexao.execute(`
       SELECT id, nome, predio, capacidade, abre_as, fecha_as, ativa
       FROM salas WHERE id = ? FOR UPDATE
@@ -274,7 +338,6 @@ reservasRouter.post('/', async (req, res) => {
       throw new ErroHttp(422, `A sala funciona das ${sala.abre_as.slice(0, 5)} às ${sala.fecha_as.slice(0, 5)}.`);
     }
 
-    // Expirar reservas antigas antes de buscar conflito; usa a mesma transação.
     await atualizarStatusReservas(conexao, salaId);
     const [conflitos] = await conexao.execute(`
       SELECT id FROM reservas
@@ -288,7 +351,6 @@ reservasRouter.post('/', async (req, res) => {
     const inicioUtcStr = paraSqlUtc(dataInicio);
     const fimUtcStr = paraSqlUtc(dataFim);
 
-    // Gera token unívoco e salva apenas o hash no banco
     const qrToken = gerarTokenReserva({
       usuarioId: req.usuario.id,
       salaId,
@@ -297,7 +359,6 @@ reservasRouter.post('/', async (req, res) => {
     });
     const qrTokenHash = hashTokenQr(qrToken);
 
-    // Nome/telefone são obtidos da sessão. O RA só é copiado como hash irreversível.
     const [resultado] = await conexao.execute(`
       INSERT INTO reservas (
         usuario_id, sala_id, inicio_utc, fim_utc, qtd_pessoas,
@@ -309,10 +370,10 @@ reservasRouter.post('/', async (req, res) => {
         titulo, descricao, nomes, qrTokenHash]);
     await conexao.commit();
 
-    const frontendBase = process.env.FRONTEND_URL || 'http://localhost/CampusFlow/frontend';
+    const frontendBase = obterFrontendBase(req);
     const checkinUrl = `${frontendBase}/pages/checkin.html?token=${encodeURIComponent(qrToken)}`;
 
-    // Notificação assíncrona por e-mail com QR Code incorporado
+    // Disparo assíncrono de e-mail com dados e QR Code incorporado
     setImmediate(() => {
       notificarReservaCriada({
         reservaId: resultado.insertId,
@@ -345,8 +406,8 @@ reservasRouter.post('/', async (req, res) => {
   }
 });
 
-// POST /api/reservas/:id/cancelar - permitido ao titular antes do início.
-reservasRouter.post('/:id/cancelar', async (req, res) => {
+// POST /api/reservas/:id/cancelar
+reservasRouter.post('/:id/cancelar', exigirLogin, async (req, res) => {
   const reservaId = Number(req.params.id);
   if (!Number.isInteger(reservaId) || reservaId < 1) throw new ErroHttp(422, 'Reserva inválida.');
   const conexao = await pool.getConnection();

@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import net from 'node:net';
+import tls from 'node:tls';
 import { fileURLToPath } from 'node:url';
 import { FUSO_CAMPUS } from '../utils/datas.js';
 import { gerarQrCodeSvg } from '../utils/qrcode.js';
@@ -23,6 +25,193 @@ function formatarHoraCampus(dataIsoOuDate) {
     timeZone: FUSO_CAMPUS,
     timeStyle: 'short',
   }).format(data);
+}
+
+/**
+ * Cliente SMTP nativo em Node.js (sem dependências externas)
+ * Suporta STARTTLS (porta 587), SSL direto (porta 465) e autenticação AUTH LOGIN.
+ */
+function enviarEmailSmtp({ host, port = 587, secure = false, user, pass, from, to, subject, html }) {
+  return new Promise((resolve, reject) => {
+    let socket;
+    let stage = 'INIT';
+    let respostaBuffer = '';
+
+    const timeoutTimer = setTimeout(() => {
+      if (socket) socket.destroy();
+      reject(new Error(`Timeout na comunicação SMTP com ${host}:${port}`));
+    }, 20000);
+
+    function cleanup() {
+      clearTimeout(timeoutTimer);
+      if (socket && !socket.destroyed) socket.end();
+    }
+
+    function sendCommand(cmd) {
+      if (socket && !socket.destroyed) {
+        socket.write(`${cmd}\r\n`);
+      }
+    }
+
+    function handleData(chunk) {
+      respostaBuffer += chunk.toString('utf8');
+      const linhas = respostaBuffer.split(/\r?\n/);
+      respostaBuffer = linhas.pop() || '';
+
+      for (const linha of linhas) {
+        if (!linha.trim()) continue;
+        const codigo = parseInt(linha.slice(0, 3), 10);
+        const ehContinuacao = linha.charAt(3) === '-';
+        if (ehContinuacao) continue;
+
+        processarResposta(codigo, linha);
+      }
+    }
+
+    function processarResposta(codigo, linha) {
+      if (codigo >= 400) {
+        cleanup();
+        return reject(new Error(`Erro SMTP no estágio [${stage}]: ${linha}`));
+      }
+
+      switch (stage) {
+        case 'INIT':
+          if (codigo === 220) {
+            stage = 'EHLO';
+            sendCommand('EHLO localhost');
+          }
+          break;
+
+        case 'EHLO':
+          if (codigo === 250) {
+            if (!secure && port === 587) {
+              stage = 'STARTTLS';
+              sendCommand('STARTTLS');
+            } else if (user && pass) {
+              stage = 'AUTH_LOGIN';
+              sendCommand('AUTH LOGIN');
+            } else {
+              stage = 'MAIL_FROM';
+              sendCommand(`MAIL FROM:<${from}>`);
+            }
+          }
+          break;
+
+        case 'STARTTLS':
+          if (codigo === 220) {
+            socket.removeAllListeners('data');
+            const tlsSocket = tls.connect({
+              socket,
+              host,
+              servername: host,
+              rejectUnauthorized: false,
+            });
+            socket = tlsSocket;
+            socket.on('data', handleData);
+            socket.on('error', (err) => { cleanup(); reject(err); });
+
+            stage = 'EHLO_AFTER_TLS';
+            sendCommand('EHLO localhost');
+          }
+          break;
+
+        case 'EHLO_AFTER_TLS':
+          if (codigo === 250) {
+            if (user && pass) {
+              stage = 'AUTH_LOGIN';
+              sendCommand('AUTH LOGIN');
+            } else {
+              stage = 'MAIL_FROM';
+              sendCommand(`MAIL FROM:<${from}>`);
+            }
+          }
+          break;
+
+        case 'AUTH_LOGIN':
+          if (codigo === 334) {
+            stage = 'AUTH_USER';
+            sendCommand(Buffer.from(user).toString('base64'));
+          }
+          break;
+
+        case 'AUTH_USER':
+          if (codigo === 334) {
+            stage = 'AUTH_PASS';
+            sendCommand(Buffer.from(pass).toString('base64'));
+          }
+          break;
+
+        case 'AUTH_PASS':
+          if (codigo === 235 || codigo === 250) {
+            stage = 'MAIL_FROM';
+            sendCommand(`MAIL FROM:<${from}>`);
+          }
+          break;
+
+        case 'MAIL_FROM':
+          if (codigo === 250) {
+            stage = 'RCPT_TO';
+            sendCommand(`RCPT TO:<${to}>`);
+          }
+          break;
+
+        case 'RCPT_TO':
+          if (codigo === 250) {
+            stage = 'DATA';
+            sendCommand('DATA');
+          }
+          break;
+
+        case 'DATA':
+          if (codigo === 354) {
+            stage = 'SEND_BODY';
+            const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`;
+            const mime = [
+              `From: ${from}`,
+              `To: ${to}`,
+              `Subject: ${encodedSubject}`,
+              'MIME-Version: 1.0',
+              'Content-Type: text/html; charset=UTF-8',
+              'Content-Transfer-Encoding: 8bit',
+              `Date: ${new Date().toUTCString()}`,
+              '',
+              html,
+              '',
+              '.',
+            ].join('\r\n');
+
+            sendCommand(mime);
+          }
+          break;
+
+        case 'SEND_BODY':
+          if (codigo === 250) {
+            stage = 'QUIT';
+            sendCommand('QUIT');
+            cleanup();
+            resolve({ sucesso: true });
+          }
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    try {
+      if (secure || port === 465) {
+        socket = tls.connect({ host, port, servername: host, rejectUnauthorized: false });
+      } else {
+        socket = net.connect({ host, port });
+      }
+
+      socket.on('data', handleData);
+      socket.on('error', (err) => { cleanup(); reject(err); });
+    } catch (err) {
+      cleanup();
+      reject(err);
+    }
+  });
 }
 
 /**
@@ -54,19 +243,19 @@ export function construirHtmlEmailConfirmacao({
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #1e293b; margin: 0; padding: 24px; }
     .card { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .header { background: #1e3a8a; color: #ffffff; padding: 28px 24px; text-align: center; }
-    .header h1 { margin: 0 0 6px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .header h1 { margin: 0 0 6px 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
     .header p { margin: 0; font-size: 14px; opacity: 0.9; }
     .content { padding: 28px 24px; }
-    .greeting { font-size: 16px; margin-bottom: 20px; }
-    .info-box { background: #f8fafc; border-left: 4px solid #2563eb; padding: 16px; border-radius: 6px; margin-bottom: 24px; }
+    .greeting { font-size: 16px; margin-bottom: 20px; line-height: 1.5; }
+    .info-box { background: #f8fafc; border-left: 4px solid #2563eb; padding: 18px; border-radius: 6px; margin-bottom: 24px; }
     .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
     .info-row:last-child { margin-bottom: 0; }
     .info-label { color: #64748b; font-weight: 500; }
     .info-value { color: #0f172a; font-weight: 600; text-align: right; }
     .qr-section { text-align: center; background: #ffffff; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px; margin: 24px 0; }
-    .qr-container { display: inline-block; padding: 12px; background: #ffffff; border-radius: 8px; }
+    .qr-container { display: inline-block; padding: 12px; background: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
     .qr-hint { font-size: 13px; color: #475569; margin-top: 14px; line-height: 1.5; }
-    .btn-action { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 14px; }
+    .btn-action { display: inline-block; background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; margin-top: 14px; }
     .alert { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 14px; border-radius: 8px; font-size: 13px; line-height: 1.5; margin-top: 20px; }
     .footer { text-align: center; padding: 20px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
   </style>
@@ -107,7 +296,7 @@ export function construirHtmlEmailConfirmacao({
           <strong>Como validar a presença:</strong><br>
           No dia e horário da reserva, exiba este QR Code ou projete-o na sala para que os participantes escaneiem com a câmera do celular.
         </div>
-        <div>
+        <div style="margin-top: 16px;">
           <a href="${checkinUrl}" class="btn-action" target="_blank" rel="noopener">Link Direto de Check-in</a>
         </div>
       </div>
@@ -127,7 +316,7 @@ export function construirHtmlEmailConfirmacao({
 
 /**
  * Notifica o organizador sobre a reserva criada com o QR Code.
- * Desacoplado do banco de dados (grava na pasta outbox para ambiente local).
+ * Envia o e-mail real via SMTP (se configurado no .env) e grava cópia na pasta outbox para desenvolvimento.
  */
 export async function notificarReservaCriada({
   reservaId,
@@ -159,7 +348,7 @@ export async function notificarReservaCriada({
       qrSvg,
     });
 
-    // Garante que o diretório de outbox exista
+    // 1. Grava na pasta outbox local para histórico e desenvolvimento
     if (!fs.existsSync(OUTBOX_DIR)) {
       fs.mkdirSync(OUTBOX_DIR, { recursive: true });
     }
@@ -192,11 +381,38 @@ export async function notificarReservaCriada({
       'utf8'
     );
 
-    console.log(`[Notificação] E-mail com QR Code gerado para a Reserva #${reservaId}. Arquivo: outbox/${nomeArquivoHtml}`);
+    console.log(`[Notificação] E-mail com QR Code gerado para Reserva #${reservaId}. Arquivo local: outbox/${nomeArquivoHtml}`);
+
+    // 2. Envio REAL por SMTP caso configurado no .env
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpHost && smtpUser && smtpPass && usuario.email) {
+      console.log(`[Notificação] Enviando e-mail real para ${usuario.email} via SMTP (${smtpHost})...`);
+      try {
+        await enviarEmailSmtp({
+          host: smtpHost,
+          port: Number(process.env.SMTP_PORT || 587),
+          secure: process.env.SMTP_SECURE === 'true',
+          user: smtpUser,
+          pass: smtpPass,
+          from: process.env.SMTP_FROM || `"CampusFlow" <${smtpUser}>`,
+          to: usuario.email,
+          subject: `Confirmação de Reserva #${reservaId} (${sala.nome}) - CampusFlow`,
+          html,
+        });
+        console.log(`[Notificação] ✓ E-mail entregue com sucesso para ${usuario.email}!`);
+      } catch (smtpErr) {
+        console.error(`[Notificação] ✗ Falha ao enviar e-mail via SMTP para ${usuario.email}:`, smtpErr.message);
+      }
+    } else {
+      console.log(`[Notificação] ℹ Variáveis SMTP (SMTP_HOST, SMTP_USER, SMTP_PASS) não configuradas no .env. E-mail salvo apenas na pasta outbox/.`);
+    }
 
     return { sucesso: true, outboxPath: caminhoHtml, checkinUrl };
   } catch (erro) {
-    console.error(`[Notificação] Falha ao gerar e-mail para a Reserva #${reservaId}:`, erro);
+    console.error(`[Notificação] Falha ao processar notificação da Reserva #${reservaId}:`, erro);
     return { sucesso: false, erro: erro.message };
   }
 }

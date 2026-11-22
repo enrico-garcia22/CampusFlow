@@ -1,9 +1,10 @@
 import crypto from 'node:crypto';
+import os from 'node:os';
 
 /**
  * CampusFlow - Gerador e Validador de QR Code
- * Implementação pura em JavaScript para independência de bibliotecas nativas.
- * Gera matriz QR padrão ISO/IEC 18004 (versões 1 a 10, nível M/L, modo Byte).
+ * Implementação pura em JavaScript para total independência de bibliotecas nativas,
+ * em estrita conformidade com a norma ISO/IEC 18004 (versões 1 a 10, nível M/L, modo Byte).
  */
 
 export function gerarTokenQr() {
@@ -12,7 +13,6 @@ export function gerarTokenQr() {
 
 /**
  * Gera um token unívoco e seguro para a reserva usando HMAC com o segredo do servidor.
- * Permite que o organizador recupere o QR Code autenticado sem salvar o token em texto puro no banco.
  */
 export function gerarTokenReserva({ usuarioId, salaId, inicioUtc, fimUtc }) {
   const secret = process.env.JWT_SECRET || 'campusflow_jwt_secret_dev_key_min_32';
@@ -27,12 +27,54 @@ export function hashTokenQr(token) {
   return crypto.createHash('sha256').update(token.trim()).digest('hex');
 }
 
+/**
+ * Detecta o IP local IPv4 da máquina na rede local (ex: 192.168.x.x ou 10.x.x.x),
+ * ignorando interfaces virtuais como Hamachi/Loopback para permitir leitura fácil por celular.
+ */
+export function obterIpLocal() {
+  try {
+    const interfaces = os.networkInterfaces();
+    let ipCandidato = null;
+
+    for (const [nome, addrs] of Object.entries(interfaces)) {
+      if (!addrs) continue;
+      const nomeLower = nome.toLowerCase();
+      // Ignora loopback e adaptadores virtuais comuns
+      if (nomeLower.includes('hamachi') || nomeLower.includes('virtual') || nomeLower.includes('vetor')) continue;
+
+      for (const addr of addrs) {
+        if (addr.family === 'IPv4' && !addr.internal) {
+          if (addr.address.startsWith('192.168.') || addr.address.startsWith('10.')) {
+            return addr.address;
+          }
+          if (!ipCandidato && !addr.address.startsWith('169.254.') && !addr.address.startsWith('25.')) {
+            ipCandidato = addr.address;
+          }
+        }
+      }
+    }
+    return ipCandidato || '127.0.0.1';
+  } catch {
+    return '127.0.0.1';
+  }
+}
+
 // -------------------------------------------------------------
-// Implementação de Matriz QR Code pura (sem dependências externas)
+// Implementação de QR Code ISO/IEC 18004 pura e robusta
 // -------------------------------------------------------------
 
-const QRMode = { MODE_NUMBER: 1, MODE_ALPHA_NUM: 2, MODE_8BIT_BYTE: 4 };
-const QRErrorCorrectLevel = { L: 1, M: 0, Q: 3, H: 2 };
+export const QRErrorCorrectLevel = {
+  L: 1,
+  M: 0,
+  Q: 3,
+  H: 2,
+};
+
+const QRMode = {
+  MODE_NUMBER: 1,
+  MODE_ALPHA_NUM: 2,
+  MODE_8BIT_BYTE: 4,
+};
 
 // Tabelas Galois Field GF(256) com polinômio primitivo 0x11D
 const EXP_TABLE = new Uint8Array(256);
@@ -86,62 +128,81 @@ class QRPolynomial {
   }
 }
 
-// Capacidades e blocos de código de correção de erro por versão (V1 a V10)
+// RS_BLOCK_TABLE: [count, totalCount, dataCount] indexado por [versao-1][eccLevelIndex]
+// Onde eccLevelIndex: L=0, M=1, Q=2, H=3
 const RS_BLOCK_TABLE = [
-  // [totalCodewords, dataCodewords, ecCount]
   // V1
-  [ [1, 26, 19] ], // L
-  [ [1, 26, 16] ], // M
-  [ [1, 26, 13] ], // Q
-  [ [1, 26, 9] ],  // H
+  [ [1, 26, 19], [1, 26, 16], [1, 26, 13], [1, 26, 9] ],
   // V2
-  [ [1, 44, 34] ],
-  [ [1, 44, 28] ],
-  [ [1, 44, 22] ],
-  [ [1, 44, 16] ],
+  [ [1, 44, 34], [1, 44, 28], [1, 44, 22], [1, 44, 16] ],
   // V3
-  [ [1, 70, 55] ],
-  [ [1, 70, 44] ],
-  [ [2, 35, 17] ],
-  [ [2, 35, 13] ],
+  [ [1, 70, 55], [1, 70, 44], [2, 35, 17], [2, 35, 13] ],
   // V4
-  [ [1, 100, 80] ],
-  [ [2, 50, 32] ],
-  [ [2, 50, 24] ],
-  [ [4, 25, 9] ],
+  [ [1, 100, 80], [2, 50, 32], [2, 50, 24], [4, 25, 9] ],
   // V5
-  [ [1, 134, 108] ],
-  [ [2, 67, 43] ],
-  [ [2, 33, 15], [2, 34, 16] ],
-  [ [2, 33, 11], [2, 34, 12] ],
+  [ [1, 134, 108], [2, 67, 43], [2, 33, 15], [2, 34, 16], [2, 33, 11], [2, 34, 12] ],
   // V6
-  [ [2, 86, 68] ],
-  [ [4, 43, 27] ],
-  [ [4, 43, 19] ],
-  [ [4, 43, 15] ],
+  [ [2, 86, 68], [4, 43, 27], [4, 43, 19], [4, 43, 15] ],
   // V7
-  [ [2, 98, 78] ],
-  [ [4, 49, 31] ],
-  [ [2, 32, 14], [4, 33, 15] ],
-  [ [4, 39, 13], [1, 40, 14] ],
+  [ [2, 98, 78], [4, 49, 31], [2, 32, 14], [4, 33, 15], [4, 39, 13], [1, 40, 14] ],
   // V8
-  [ [2, 121, 97] ],
-  [ [2, 60, 38], [2, 61, 39] ],
-  [ [4, 40, 18], [2, 41, 19] ],
-  [ [4, 40, 14], [2, 41, 15] ],
+  [ [2, 121, 97], [2, 60, 38], [2, 61, 39], [4, 40, 18], [2, 41, 19], [4, 40, 14], [2, 41, 15] ],
   // V9
-  [ [2, 146, 116] ],
-  [ [3, 58, 36], [2, 59, 37] ],
-  [ [4, 36, 16], [4, 37, 17] ],
-  [ [4, 36, 12], [4, 37, 13] ],
+  [ [2, 146, 116], [3, 58, 36], [2, 59, 37], [4, 36, 16], [4, 37, 17], [4, 36, 12], [4, 37, 13] ],
   // V10
-  [ [2, 86, 68], [2, 87, 69] ],
-  [ [4, 69, 43], [1, 70, 44] ],
-  [ [6, 43, 19], [2, 44, 20] ],
-  [ [6, 43, 15], [2, 44, 16] ],
+  [ [2, 86, 68], [2, 87, 69], [4, 69, 43], [1, 70, 44], [6, 43, 19], [2, 44, 20], [6, 43, 15], [2, 44, 16] ],
 ];
 
-const ALIGNMENT_PATTERN_TABLE = [
+function obterBlocosRs(typeNumber, errorCorrectLevel) {
+  // Converte nível para o índice da tabela [L=0, M=1, Q=2, H=3]
+  let eccIndex = 1; // default M
+  if (errorCorrectLevel === QRErrorCorrectLevel.L) eccIndex = 0;
+  else if (errorCorrectLevel === QRErrorCorrectLevel.M) eccIndex = 1;
+  else if (errorCorrectLevel === QRErrorCorrectLevel.Q) eccIndex = 2;
+  else if (errorCorrectLevel === QRErrorCorrectLevel.H) eccIndex = 3;
+
+  switch (typeNumber) {
+    case 1:
+      return [RS_BLOCK_TABLE[0][eccIndex]];
+    case 2:
+      return [RS_BLOCK_TABLE[1][eccIndex]];
+    case 3:
+      return [RS_BLOCK_TABLE[2][eccIndex]];
+    case 4:
+      return [RS_BLOCK_TABLE[3][eccIndex]];
+    case 5:
+      if (eccIndex === 0) return [[1, 134, 108]];
+      if (eccIndex === 1) return [[2, 67, 43]];
+      if (eccIndex === 2) return [[2, 33, 15], [2, 34, 16]];
+      return [[2, 33, 11], [2, 34, 12]];
+    case 6:
+      return [RS_BLOCK_TABLE[5][eccIndex]];
+    case 7:
+      if (eccIndex === 0) return [[2, 98, 78]];
+      if (eccIndex === 1) return [[4, 49, 31]];
+      if (eccIndex === 2) return [[2, 32, 14], [4, 33, 15]];
+      return [[4, 39, 13], [1, 40, 14]];
+    case 8:
+      if (eccIndex === 0) return [[2, 121, 97]];
+      if (eccIndex === 1) return [[2, 60, 38], [2, 61, 39]];
+      if (eccIndex === 2) return [[4, 40, 18], [2, 41, 19]];
+      return [[4, 40, 14], [2, 41, 15]];
+    case 9:
+      if (eccIndex === 0) return [[2, 146, 116]];
+      if (eccIndex === 1) return [[3, 58, 36], [2, 59, 37]];
+      if (eccIndex === 2) return [[4, 36, 16], [4, 37, 17]];
+      return [[4, 36, 12], [4, 37, 13]];
+    case 10:
+      if (eccIndex === 0) return [[2, 86, 68], [2, 87, 69]];
+      if (eccIndex === 1) return [[4, 69, 43], [1, 70, 44]];
+      if (eccIndex === 2) return [[6, 43, 19], [2, 44, 20]];
+      return [[6, 43, 15], [2, 44, 16]];
+    default:
+      return [[1, 44, 28]];
+  }
+}
+
+const PATTERN_POSITION_TABLE = [
   [],
   [6, 18],
   [6, 22],
@@ -196,9 +257,11 @@ class QRCodeModel {
     this.modules = null;
     this.moduleCount = 0;
     this.dataList = [];
+    this.dataCache = null;
   }
   addData(data) {
     this.dataList.push(new QR8bitByte(data));
+    this.dataCache = null;
   }
   isDark(row, col) {
     if (row < 0 || this.moduleCount <= row || col < 0 || this.moduleCount <= col) {
@@ -207,28 +270,57 @@ class QRCodeModel {
     return this.modules[row][col];
   }
   getModuleCount() { return this.moduleCount; }
+
   make() {
+    // Avalia os 8 padrões de máscara e seleciona o padrão com menor pontuação de penalidade ISO
+    let minLostPoint = Infinity;
+    let bestPattern = 0;
+
+    for (let i = 0; i < 8; i++) {
+      this.makeImpl(true, i);
+      const lostPoint = QRCodeModel.getLostPoint(this);
+      if (lostPoint < minLostPoint) {
+        minLostPoint = lostPoint;
+        bestPattern = i;
+      }
+    }
+
+    // Executa a montagem final com a melhor máscara e grava os bits definitivos de Tipo/Formato
+    this.makeImpl(false, bestPattern);
+  }
+
+  makeImpl(test, maskPattern) {
     this.moduleCount = this.typeNumber * 4 + 17;
     this.modules = Array.from({ length: this.moduleCount }, () => new Array(this.moduleCount).fill(null));
+
     this.setupPositionProbePattern(0, 0);
     this.setupPositionProbePattern(this.moduleCount - 7, 0);
     this.setupPositionProbePattern(0, this.moduleCount - 7);
     this.setupPositionAdjustPattern();
     this.setupTimingPattern();
-    this.setupTypeInfo(true, 0);
-    if (this.typeNumber >= 7) this.setupTypeNumber(true);
+    this.setupTypeInfo(test, maskPattern);
 
-    const data = QRCodeModel.createData(this.typeNumber, this.errorCorrectLevel, this.dataList);
-    this.mapData(data, 0);
+    if (this.typeNumber >= 7) {
+      this.setupTypeNumber(test);
+    }
+
+    if (this.dataCache == null) {
+      this.dataCache = QRCodeModel.createData(this.typeNumber, this.errorCorrectLevel, this.dataList);
+    }
+
+    this.mapData(this.dataCache, maskPattern);
   }
+
   setupPositionProbePattern(row, col) {
     for (let r = -1; r <= 7; r++) {
       if (row + r <= -1 || this.moduleCount <= row + r) continue;
       for (let c = -1; c <= 7; c++) {
         if (col + c <= -1 || this.moduleCount <= col + c) continue;
-        if ((0 <= r && r <= 6 && (c === 0 || c === 6))
-            || (0 <= c && c <= 6 && (r === 0 || r === 6))
-            || (2 <= r && r <= 4 && 2 <= c && c <= 4)) {
+        if (
+          (0 <= r && r <= 6 && (c === 0 || c === 6)) ||
+          (0 <= c && c <= 6 && (r === 0 || r === 6)) ||
+          (2 <= r && r <= 4 && 2 <= c && c <= 4)
+        ) {
           this.modules[row + r][col + c] = true;
         } else {
           this.modules[row + r][col + c] = false;
@@ -236,6 +328,7 @@ class QRCodeModel {
       }
     }
   }
+
   setupTimingPattern() {
     for (let r = 8; r < this.moduleCount - 8; r++) {
       if (this.modules[r][6] !== null) continue;
@@ -246,14 +339,26 @@ class QRCodeModel {
       this.modules[6][c] = (c % 2 === 0);
     }
   }
+
   setupPositionAdjustPattern() {
-    const pos = ALIGNMENT_PATTERN_TABLE[this.typeNumber - 1];
-    if (!pos) return;
+    const pos = PATTERN_POSITION_TABLE[this.typeNumber - 1];
+    if (!pos || pos.length === 0) return;
+
     for (let i = 0; i < pos.length; i++) {
       for (let j = 0; j < pos.length; j++) {
+        // Ignora os 3 cantos onde estão os Finder Patterns para não colidir
+        if (
+          (i === 0 && j === 0) ||
+          (i === 0 && j === pos.length - 1) ||
+          (i === pos.length - 1 && j === 0)
+        ) {
+          continue;
+        }
+
         const row = pos[i];
         const col = pos[j];
         if (this.modules[row][col] !== null) continue;
+
         for (let r = -2; r <= 2; r++) {
           for (let c = -2; c <= 2; c++) {
             if (r === -2 || r === 2 || c === -2 || c === 2 || (r === 0 && c === 0)) {
@@ -266,23 +371,28 @@ class QRCodeModel {
       }
     }
   }
+
   setupTypeInfo(test, maskPattern) {
     const data = (this.errorCorrectLevel << 3) | maskPattern;
     const bits = QRCodeModel.getBCHTypeInfo(data);
+
     for (let i = 0; i < 15; i++) {
       const mod = (!test && ((bits >> i) & 1) === 1);
       if (i < 6) this.modules[i][8] = mod;
       else if (i < 8) this.modules[i + 1][8] = mod;
       else this.modules[this.moduleCount - 15 + i][8] = mod;
     }
+
     for (let i = 0; i < 15; i++) {
       const mod = (!test && ((bits >> i) & 1) === 1);
       if (i < 8) this.modules[8][this.moduleCount - i - 1] = mod;
       else if (i < 9) this.modules[8][15 - i - 1 + 1] = mod;
       else this.modules[8][15 - i - 1] = mod;
     }
+
     this.modules[this.moduleCount - 8][8] = !test;
   }
+
   setupTypeNumber(test) {
     const bits = QRCodeModel.getBCHTypeNumber(this.typeNumber);
     for (let i = 0; i < 18; i++) {
@@ -294,6 +404,7 @@ class QRCodeModel {
       this.modules[(i % 3) + this.moduleCount - 8 - 3][Math.floor(i / 3)] = mod;
     }
   }
+
   mapData(data, maskPattern) {
     let inc = -1;
     let row = this.moduleCount - 1;
@@ -350,13 +461,15 @@ class QRCodeModel {
     }
     return ((data << 10) | d) ^ 0x5412;
   }
+
   static getBCHTypeNumber(data) {
     let d = data << 12;
-    while (QRCodeModel.getBCHDigit(d) - QRCodeModel.getBCHDigit(0x1F25) >= 0) {
-      d ^= (0x1F25 << (QRCodeModel.getBCHDigit(d) - QRCodeModel.getBCHDigit(0x1F25)));
+    while (QRCodeModel.getBCHDigit(d) - QRCodeModel.getBCHDigit(0x1f25) >= 0) {
+      d ^= (0x1f25 << (QRCodeModel.getBCHDigit(d) - QRCodeModel.getBCHDigit(0x1f25)));
     }
     return (data << 12) | d;
   }
+
   static getBCHDigit(data) {
     let digit = 0;
     while (data !== 0) {
@@ -366,8 +479,103 @@ class QRCodeModel {
     return digit;
   }
 
+  static getLostPoint(qr) {
+    const moduleCount = qr.getModuleCount();
+    let lostPoint = 0;
+
+    // LEVEL 1: módulos consecutivos de mesma cor (horizontal e vertical)
+    for (let row = 0; row < moduleCount; row++) {
+      let sameCount = 0;
+      let prev = null;
+      for (let col = 0; col < moduleCount; col++) {
+        const dark = qr.isDark(row, col);
+        if (dark === prev) {
+          sameCount++;
+        } else {
+          if (sameCount >= 5) lostPoint += (3 + sameCount - 5);
+          prev = dark;
+          sameCount = 1;
+        }
+      }
+      if (sameCount >= 5) lostPoint += (3 + sameCount - 5);
+    }
+
+    for (let col = 0; col < moduleCount; col++) {
+      let sameCount = 0;
+      let prev = null;
+      for (let row = 0; row < moduleCount; row++) {
+        const dark = qr.isDark(row, col);
+        if (dark === prev) {
+          sameCount++;
+        } else {
+          if (sameCount >= 5) lostPoint += (3 + sameCount - 5);
+          prev = dark;
+          sameCount = 1;
+        }
+      }
+      if (sameCount >= 5) lostPoint += (3 + sameCount - 5);
+    }
+
+    // LEVEL 2: blocos 2x2 de mesma cor
+    for (let row = 0; row < moduleCount - 1; row++) {
+      for (let col = 0; col < moduleCount - 1; col++) {
+        let count = 0;
+        if (qr.isDark(row, col)) count++;
+        if (qr.isDark(row + 1, col)) count++;
+        if (qr.isDark(row, col + 1)) count++;
+        if (qr.isDark(row + 1, col + 1)) count++;
+        if (count === 0 || count === 4) lostPoint += 3;
+      }
+    }
+
+    // LEVEL 3: padrão 1:1:3:1:1 semelhante ao Finder Pattern nos dados
+    for (let row = 0; row < moduleCount; row++) {
+      for (let col = 0; col < moduleCount - 6; col++) {
+        if (
+          qr.isDark(row, col) &&
+          !qr.isDark(row, col + 1) &&
+          qr.isDark(row, col + 2) &&
+          qr.isDark(row, col + 3) &&
+          qr.isDark(row, col + 4) &&
+          !qr.isDark(row, col + 5) &&
+          qr.isDark(row, col + 6)
+        ) {
+          lostPoint += 40;
+        }
+      }
+    }
+
+    for (let col = 0; col < moduleCount; col++) {
+      for (let row = 0; row < moduleCount - 6; row++) {
+        if (
+          qr.isDark(row, col) &&
+          !qr.isDark(row + 1, col) &&
+          qr.isDark(row + 2, col) &&
+          qr.isDark(row + 3, col) &&
+          qr.isDark(row + 4, col) &&
+          !qr.isDark(row + 5, col) &&
+          qr.isDark(row + 6, col)
+        ) {
+          lostPoint += 40;
+        }
+      }
+    }
+
+    // LEVEL 4: equilíbrio entre módulos claros e escuros (~50%)
+    let darkCount = 0;
+    for (let col = 0; col < moduleCount; col++) {
+      for (let row = 0; row < moduleCount; row++) {
+        if (qr.isDark(row, col)) darkCount++;
+      }
+    }
+    const ratio = Math.abs((100 * darkCount) / (moduleCount * moduleCount) - 50) / 5;
+    lostPoint += Math.floor(ratio) * 10;
+
+    return lostPoint;
+  }
+
   static createData(typeNumber, errorCorrectLevel, dataList) {
-    const rsBlocks = RS_BLOCK_TABLE[(typeNumber - 1) * 4 + errorCorrectLevel];
+    const rsBlocks = obterBlocosRs(typeNumber, errorCorrectLevel);
     const buffer = new QRBitBuffer();
 
     for (const data of dataList) {
@@ -464,13 +672,12 @@ class QRCodeModel {
 /**
  * Determina a menor versão de QR necessária para a quantidade de bytes
  */
-function determinarVersao(numBytes, errorCorrectLevel = QRErrorCorrectLevel.M) {
+export function determinarVersao(numBytes, errorCorrectLevel = QRErrorCorrectLevel.M) {
   for (let v = 1; v <= 10; v++) {
-    const rsBlocks = RS_BLOCK_TABLE[(v - 1) * 4 + errorCorrectLevel];
+    const rsBlocks = obterBlocosRs(v, errorCorrectLevel);
     let totalDataCount = 0;
     for (const b of rsBlocks) totalDataCount += b[0] * b[2];
-    // Modo Byte consome 4 bits modo + 8 bits tamanho + dados*8 + 4 bits término
-    const bitsNecessarios = 4 + 8 + (numBytes * 8) + 4;
+    const bitsNecessarios = 4 + (v < 10 ? 8 : 16) + (numBytes * 8) + 4;
     if (bitsNecessarios <= totalDataCount * 8) return v;
   }
   return 10;

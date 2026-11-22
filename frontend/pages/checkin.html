@@ -57,6 +57,47 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
+    }
+    .scanner-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #2563eb, transparent);
+      animation: scanMove 2s ease-in-out infinite;
+      top: 50%;
+    }
+    @keyframes scanMove {
+      0%, 100% { top: 20%; opacity: 0; }
+      50% { top: 80%; opacity: 1; }
+    }
+    .scanner-hint {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15,23,42,0.8);
+      color: #94a3b8;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .nome-anon {
+      font-size: 14px;
+      margin-top: 12px;
+      text-align: left;
+    }
+    .badge-anon {
+      display: inline-block;
+      background: #fef9c3;
+      color: #854d0e;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      font-size: 12px;
+      padding: 4px 10px;
+      margin-bottom: 12px;
     }
   </style>
   <script defer src="../assets/js/api.js"></script>
@@ -75,46 +116,46 @@
           <div>
             <span class="eyebrow">VERIFICAÇÃO DE USO</span>
             <h1>Check-in de Presença</h1>
-            <p>Validação da reserva e registro de frequência através de QR Code.</p>
+            <p>Escaneie o QR Code com a câmera do celular para confirmar sua presença.</p>
           </div>
         </section>
 
         <div class="checkin-container">
           <div id="checkinCard" class="panel checkin-card">
+
+            <!-- Estado: Carregando -->
             <div id="loadingState">
               <span class="checkin-icon primary" aria-hidden="true">⌛</span>
               <h2>Processando validação…</h2>
               <p class="muted">Aguarde um instante enquanto verificamos as informações da reserva.</p>
             </div>
 
-            <div id="unauthWarning" hidden>
-              <span class="checkin-icon primary" aria-hidden="true">👤</span>
-              <h2>Identificação necessária</h2>
-              <p class="muted mb-18">Para registrar sua presença na sala, entre na sua conta do CampusFlow ou cadastre-se com seu RA.</p>
-              <div class="dialog-actions" style="justify-content: center; gap: 12px;">
-                <a id="btnEntrar" href="../index.html" class="btn btn-primary">Fazer Login</a>
-                <a id="btnCadastrar" href="cadastro.html" class="btn btn-outline">Criar Conta</a>
-              </div>
-            </div>
-
+            <!-- Estado: Confirmação com token recebido (pode vir sem login) -->
             <div id="readyToConfirm" hidden>
               <span class="checkin-icon primary" aria-hidden="true">▣</span>
-              <h2>Confirmar sua presença</h2>
+              <h2>Confirmar Presença</h2>
               <p class="muted">Você está prestes a validar sua presença nesta reserva de espaço acadêmico.</p>
               <div id="userBadge" class="info-banner mb-18" style="text-align: left;">
                 <span class="banner-bubble" aria-hidden="true">i</span>
                 <p id="userInfoText">Carregando seus dados…</p>
               </div>
+              <!-- Campo de nome exibido apenas para usuários não logados -->
+              <div id="nomeAnonBox" hidden class="field nome-anon">
+                <label for="nomeAnonInput">Seu nome (opcional)</label>
+                <input type="text" id="nomeAnonInput" placeholder="Ex: João Silva" autocomplete="name">
+              </div>
               <button type="button" id="btnConfirmarPresenca" class="btn btn-primary" style="width: 100%; padding: 14px;">
-                Validar Minha Presença Agora
+                Confirmar Minha Presença
               </button>
+              <p class="muted small" style="margin-top: 10px;">Nenhum login necessário.</p>
             </div>
 
+            <!-- Estado: Sucesso -->
             <div id="successState" hidden>
               <span class="checkin-icon success" aria-hidden="true">✓</span>
               <h2 id="successTitle">Presença Confirmada!</h2>
               <p id="successSubtitle" class="muted">Sua frequência nesta sala foi registrada no sistema.</p>
-              
+
               <div class="stats-pill" id="statsPill">
                 <span id="attendeesCount">1 participante presente</span>
               </div>
@@ -122,11 +163,11 @@
               <div id="successDetails" class="detail-stack mb-18" style="text-align: left;"></div>
 
               <div class="dialog-actions" style="justify-content: center; gap: 10px;">
-                <a href="minhas-reservas.html" class="btn btn-outline">Minhas Reservas</a>
                 <a href="salas.html" class="btn btn-primary">Ver Salas</a>
               </div>
             </div>
 
+            <!-- Estado: Erro -->
             <div id="errorState" hidden>
               <span class="checkin-icon error" aria-hidden="true">⚠</span>
               <h2 id="errorTitle">Validação não realizada</h2>
@@ -137,26 +178,30 @@
               </div>
             </div>
 
+            <!-- Estado: Scanner Manual (sem token na URL) -->
             <div id="manualState" hidden>
               <span class="checkin-icon primary" aria-hidden="true">📷</span>
               <h2>Leitura de QR Code</h2>
-              <p class="muted">Aponte a câmera para o QR Code projetado ou digite o código de validação.</p>
-              
+              <p class="muted">Aponte a câmera do celular para o QR Code projetado na sala.</p>
+
               <div id="scannerContainer" class="scanner-box" hidden>
-                <video id="scannerVideo" playsinline></video>
+                <video id="scannerVideo" playsinline autoplay muted></video>
+                <div class="scanner-line"></div>
+                <span class="scanner-hint">Aponte para o QR Code</span>
               </div>
-              <button type="button" id="btnIniciarCamera" class="btn btn-outline btn-sm mb-18">
-                Abrir Câmera para Escanear
+              <button type="button" id="btnIniciarCamera" class="btn btn-primary" style="width: 100%; margin-bottom: 16px;">
+                📷 Abrir Câmera para Escanear
               </button>
 
               <div class="field" style="text-align: left;">
-                <label for="manualToken">Código do Token</label>
+                <label for="manualToken">Ou cole o token manualmente</label>
                 <input type="text" id="manualToken" placeholder="Cole o token do QR Code aqui…">
               </div>
-              <button type="button" id="btnValidarManual" class="btn btn-primary" style="width: 100%;">
+              <button type="button" id="btnValidarManual" class="btn btn-outline" style="width: 100%;">
                 Validar Código
               </button>
             </div>
+
           </div>
         </div>
       </main>
