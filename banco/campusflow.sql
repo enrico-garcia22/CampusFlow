@@ -71,6 +71,16 @@ CREATE TABLE IF NOT EXISTS checkins (
   CONSTRAINT fk_checkins_validador FOREIGN KEY (validado_por_usuario_id) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS presencas (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  reserva_id INT UNSIGNED NOT NULL,
+  usuario_id INT UNSIGNED NOT NULL,
+  registrado_em_utc DATETIME NOT NULL,
+  UNIQUE KEY uq_presencas_reserva_usuario (reserva_id, usuario_id),
+  CONSTRAINT fk_presencas_reserva FOREIGN KEY (reserva_id) REFERENCES reservas(id),
+  CONSTRAINT fk_presencas_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+) ENGINE=InnoDB;
+
 -- Cinco salas de demonstração; substituíveis pelas salas reais posteriormente.
 INSERT IGNORE INTO salas (nome, predio, capacidade, abre_as, fecha_as, descricao) VALUES
   ('Sala 101', 'Bloco A', 15, '07:00:00', '22:00:00', 'Sala para grupos pequenos'),

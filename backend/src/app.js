@@ -20,6 +20,10 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/salas', salasRouter);
 app.use('/api/reservas', reservasRouter);
+app.use('/api/checkin', (req, res, next) => {
+  req.url = '/checkin';
+  reservasRouter(req, res, next);
+});
 app.use('/api/admin', adminRouter);
 
 app.use((_req, _res, next) => next(new ErroHttp(404, 'Rota não encontrada.')));

@@ -58,5 +58,13 @@
     if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error('Identificador de reserva inválido.');
     return request(`/reservas/${Number(id)}/cancelar`, {method:'POST'});
   }
-  window.CF_API=Object.freeze({ BASE,read,clear,login,cadastro,me,salas,recomendadas,criarReserva,minhasReservas,cancelarReserva });
+  async function obterQrCode(reservaId) {
+    if (!Number.isSafeInteger(Number(reservaId)) || Number(reservaId) <= 0) throw new Error('Identificador de reserva inválido.');
+    return request(`/reservas/${Number(reservaId)}/qrcode`);
+  }
+  async function checkin(token) {
+    if (!token || typeof token !== 'string') throw new Error('Token de check-in inválido.');
+    return request('/reservas/checkin', {method:'POST', data:{token:token.trim()}});
+  }
+  window.CF_API=Object.freeze({ BASE,read,clear,login,cadastro,me,salas,recomendadas,criarReserva,minhasReservas,cancelarReserva,obterQrCode,checkin });
 })();

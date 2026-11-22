@@ -11,4 +11,14 @@
 <p class="muted small" id="reservationCount" aria-live="polite">Carregando reservas…</p><p class="form-error" id="historyError" role="alert" hidden></p>
 <section id="bookingList" class="booking-list" aria-label="Reservas do usuário"></section>
 <dialog class="dialog" id="confirmDialog" aria-labelledby="confirmTitle"><h2 id="confirmTitle">Cancelar reserva</h2><p>Deseja cancelar esta reserva? O horário será liberado para outros estudantes. O registro permanecerá no histórico.</p><div class="dialog-actions"><button type="button" id="dismissAction" class="btn btn-outline">Voltar</button><button type="button" id="confirmAction" class="btn btn-danger">Confirmar cancelamento</button></div></dialog>
+<dialog class="dialog" id="qrModal" aria-labelledby="qrModalTitle" style="max-width: 480px; text-align: center;">
+  <h2 id="qrModalTitle">QR Code de Presença</h2>
+  <p class="muted small" id="qrModalSubtitle">Apresente aos participantes no dia e horário da reserva</p>
+  <div id="qrModalContent" style="margin: 16px auto; min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center;"></div>
+  <div id="qrModalStats" class="detail-stack" style="text-align: left; margin-bottom: 16px;"></div>
+  <div class="dialog-actions" style="justify-content: center; gap: 8px;">
+    <button type="button" id="closeQrModal" class="btn btn-outline">Fechar</button>
+    <button type="button" id="copyCheckinLink" class="btn btn-primary">Copiar link</button>
+  </div>
+</dialog>
 </main><div id="footerMount"></div></div></div></body></html>
