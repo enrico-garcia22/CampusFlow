@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CampusFlow — gerenciamento acadêmico de salas com autenticação e consulta de salas reais.">
+  <meta name="theme-color" content="#172554">
+  <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+  <title>Acessar | CampusFlow</title>
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/responsive.css">
+  <script defer src="assets/js/api.js"></script>
+  <script defer src="assets/js/app.js"></script>
+  <script defer src="assets/js/login.js"></script>
+</head>
+<body>
+  <a href="#conteudo" class="skip-link">Pular para o conteúdo</a>
+  <main class="auth-page" id="conteudo">
+    <section class="auth-aside" aria-labelledby="introTitle">
+      <a href="index.html" class="brand" aria-label="CampusFlow, início"><span class="brand-mark" aria-hidden="true">C</span><span>Campus<span class="flow">Flow</span></span></a>
+      <div class="auth-aside-inner"><span class="eyebrow">SUA JORNADA ACADÊMICA</span>
+        <h1 id="introTitle">Tudo conectado.<br>Seu campus em fluxo.</h1>
+        <p>Explore ambientes, consulte informações e organize reservas de espaços acadêmicos com praticidade.</p>
+      </div>
+      <div class="auth-aside-foot">Um projeto para tornar o campus mais organizado.</div>
+    </section>
+    <section class="auth-content" aria-labelledby="loginTitle">
+      <div class="auth-form">
+        <a href="index.html" class="brand brand-on-white auth-mobile-brand" aria-label="CampusFlow, início"><span class="brand-mark" aria-hidden="true">C</span><span>Campus<span class="flow">Flow</span></span></a>
+        <span class="eyebrow">BEM-VINDO(A) DE VOLTA</span>
+        <h2 id="loginTitle">Acesse o CampusFlow</h2>
+        <p class="muted">Entre com seu nome de usuário e senha para acessar as salas cadastradas.</p>
+        <div class="info-banner"><span class="banner-bubble" aria-hidden="true">i</span><p><strong>Ambiente de desenvolvimento:</strong> a autenticação utiliza a API local do CampusFlow. Para dados reais, publique com HTTPS e políticas adequadas de segurança.</p></div>
+        <p id="successSignup" class="info-banner" hidden role="status">Cadastro criado com sucesso! Faça login para continuar.</p>
+        <form id="loginForm" class="form-grid">
+          <div class="field"><label for="username">Nome de usuário</label><input id="username" name="nome_usuario" type="text" placeholder="Nome de Usuário" autocomplete="username" required minlength="3" maxlength="30"></div>
+          <div class="field">
+            <label for="password">Senha</label>
+            <div class="password-field">
+              <input id="password" name="password" type="password" placeholder="Digite sua senha" autocomplete="current-password" required minlength="8">
+              <button type="button" class="password-toggle" id="togglePassword" aria-pressed="false" aria-label="Mostrar senha">Mostrar</button>
+            </div>
+          </div>
+          <p class="form-error" id="loginError" role="alert"></p>
+          <button class="btn btn-primary btn-block" type="submit">Entrar <span aria-hidden="true">→</span></button>
+        </form>
+        <div class="divider"><span>ou</span></div>
+        <a class="btn btn-outline btn-block" href="pages/cadastro.html">Não está cadastrado? Registre-se agora</a>
+        <p class="auth-bottom">Frontend HTML/CSS/JS integrado à API Node.js + MariaDB. Reservas serão conectadas na próxima fase.</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

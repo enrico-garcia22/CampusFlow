@@ -1,0 +1,56 @@
+@media (max-width: 1120px) {
+  :root { --sidebar-width:230px; }
+  .page-content { padding:27px 25px; }
+  .topbar { padding:0 25px; }
+  .room-grid { gap:14px; }
+  .room-head { padding:17px; }
+  .room-details summary { padding-inline:17px; }
+  .room-details-body { padding-inline:17px; }
+}
+@media (max-width: 900px) {
+  .sidebar { transform:translateX(-100%); transition:transform .2s ease; }
+  .sidebar.is-open { transform:translateX(0); }
+  .sidebar-overlay.is-visible { display:block; position:fixed; z-index:30; inset:0; background:#0f172a88; }
+  .app-main { margin-left:0; }
+  .menu-toggle { display:grid; }
+  .content-two { grid-template-columns:1fr; }
+  .auth-page { grid-template-columns:.8fr 1.2fr; }
+  .auth-aside { padding:32px; }
+  .auth-aside h1 { font-size:2.5rem; }
+  .auth-content { padding:35px; }
+}
+@media (max-width: 700px) {
+  .filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .room-grid, .booking-layout, .profile-layout, .module-grid { grid-template-columns:1fr; }
+  .booking-aside { position:static; }
+  .auth-page { display:block; }
+  .auth-aside { display:none; }
+  .auth-content { min-height:100vh; padding:35px 23px; }
+  .auth-mobile-brand { display:inline-flex; }
+}
+@media (max-width: 560px) {
+  .topbar { height:65px; padding:0 16px; }
+  .breadcrumb { font-size:.72rem; gap:6px; }
+  .user-chip span:not(.avatar) { display:none; }
+  .page-content { padding:24px 16px; }
+  .app-footer { padding:18px 16px; }
+  .page-heading { display:block; }
+  .page-heading .btn { margin-top:14px; }
+  .welcome { display:block; }
+  .welcome .badge { margin-top:14px; }
+  .metrics { grid-template-columns:1fr; gap:13px; }
+  .metric-card { padding:18px; }
+  .form-row, .profile-info { grid-template-columns:1fr; }
+  .filters { grid-template-columns:1fr; }
+  .filter-panel { padding:15px; }
+  .panel { padding:18px; }
+  .booking-toolbar { align-items:stretch; }
+  .booking-toolbar .filters-mini { width:100%; }
+  .booking-toolbar .filters-mini > * { flex:1; }
+  .booking-record { padding:16px; }
+  .room-info-grid { grid-template-columns:1fr; }
+  .quick-item small { font-size:.67rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
