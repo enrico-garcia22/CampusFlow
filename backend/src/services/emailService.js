@@ -5,6 +5,7 @@ import tls from 'node:tls';
 import { fileURLToPath } from 'node:url';
 import { FUSO_CAMPUS } from '../utils/datas.js';
 import { gerarQrCodeSvg } from '../utils/qrcode.js';
+import sharp from 'sharp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,7 @@ function formatarHoraCampus(dataIsoOuDate) {
  * Cliente SMTP nativo em Node.js (sem dependências externas)
  * Suporta STARTTLS (porta 587), SSL direto (porta 465) e autenticação AUTH LOGIN.
  */
-function enviarEmailSmtp({ host, port = 587, secure = false, user, pass, from, to, subject, html }) {
+function enviarEmailSmtp({ host, port = 587, secure = false, user, pass, from, to, subject, html, qrPngBase64 }) {
   return new Promise((resolve, reject) => {
     let socket;
     let stage = 'INIT';
@@ -104,7 +105,7 @@ function enviarEmailSmtp({ host, port = 587, secure = false, user, pass, from, t
               socket,
               host,
               servername: host,
-              rejectUnauthorized: false,
+              rejectUnauthorized: true,
             });
             socket = tlsSocket;
             socket.on('data', handleData);
@@ -166,19 +167,52 @@ function enviarEmailSmtp({ host, port = 587, secure = false, user, pass, from, t
           if (codigo === 354) {
             stage = 'SEND_BODY';
             const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`;
-            const mime = [
-              `From: ${from}`,
-              `To: ${to}`,
-              `Subject: ${encodedSubject}`,
-              'MIME-Version: 1.0',
-              'Content-Type: text/html; charset=UTF-8',
-              'Content-Transfer-Encoding: 8bit',
-              `Date: ${new Date().toUTCString()}`,
-              '',
-              html,
-              '',
-              '.',
-            ].join('\r\n');
+            const boundary = `campusflow_${Date.now()}`;
+
+const quebrarBase64 = (valor) =>
+  (valor.match(/.{1,76}/g) || []).join('\r\n');
+
+const cabecalhos = [
+  `From: ${from}`,
+  `To: ${to}`,
+  `Subject: ${encodedSubject}`,
+  'MIME-Version: 1.0',
+  ...(qrPngBase64
+    ? [`Content-Type: multipart/related; boundary="${boundary}"`]
+    : [
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: 8bit'
+      ]),
+  `Date: ${new Date().toUTCString()}`,
+  ''
+];
+
+const corpo = qrPngBase64
+  ? [
+      `--${boundary}`,
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      quebrarBase64(Buffer.from(html, 'utf8').toString('base64')),
+      '',
+      `--${boundary}`,
+      'Content-Type: image/png',
+      'Content-Transfer-Encoding: base64',
+      'Content-ID: <qr-campusflow@campusflow.local>',
+      'Content-Disposition: inline; filename="qrcode.png"',
+      '',
+      quebrarBase64(qrPngBase64),
+      '',
+      `--${boundary}--`
+    ].join('\r\n')
+  : html;
+
+const mime = [
+  ...cabecalhos,
+  corpo,
+  '',
+  '.'
+].join('\r\n');
 
             sendCommand(mime);
           }
@@ -200,7 +234,7 @@ function enviarEmailSmtp({ host, port = 587, secure = false, user, pass, from, t
 
     try {
       if (secure || port === 465) {
-        socket = tls.connect({ host, port, servername: host, rejectUnauthorized: false });
+        socket = tls.connect({ host, port, servername: host, rejectUnauthorized: true });
       } else {
         socket = net.connect({ host, port });
       }
@@ -290,7 +324,7 @@ export function construirHtmlEmailConfirmacao({
 
       <div class="qr-section">
         <div class="qr-container">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(checkinUrl)}" alt="QR Code de Check-in" width="220" height="220" style="display:block;margin:0 auto;" />
+          ${qrSvg}
         </div>
         <div class="qr-hint">
           <strong>Como validar a presença:</strong><br>
@@ -333,6 +367,11 @@ export async function notificarReservaCriada({
     const frontendBase = process.env.FRONTEND_URL || 'http://localhost/CampusFlow/frontend';
     const checkinUrl = `${frontendBase}/pages/checkin.html?token=${encodeURIComponent(token)}`;
     const qrSvg = gerarQrCodeSvg(checkinUrl, { tamanho: 240 });
+    const qrPngBase64 = (
+    await sharp(Buffer.from(qrSvg, 'utf8'))
+      .png()
+      .toBuffer()
+    ).toString('base64');
 
     const html = construirHtmlEmailConfirmacao({
       reservaId,
@@ -347,6 +386,10 @@ export async function notificarReservaCriada({
       checkinUrl,
       qrSvg,
     });
+    const htmlParaEmail = html.replace(
+      qrSvg,
+      '<img src="cid:qr-campusflow@campusflow.local" alt="QR Code de Check-in" width="220" height="220" style="display:block;margin:0 auto;" />'
+    );
 
     // 1. Grava na pasta outbox local para histórico e desenvolvimento
     if (!fs.existsSync(OUTBOX_DIR)) {
@@ -400,7 +443,8 @@ export async function notificarReservaCriada({
           from: process.env.SMTP_FROM || `"CampusFlow" <${smtpUser}>`,
           to: usuario.email,
           subject: `Confirmação de Reserva #${reservaId} (${sala.nome}) - CampusFlow`,
-          html,
+          html: htmlParaEmail,
+          qrPngBase64,
         });
         console.log(`[Notificação] ✓ E-mail entregue com sucesso para ${usuario.email}!`);
       } catch (smtpErr) {

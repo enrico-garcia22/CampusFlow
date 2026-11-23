@@ -18,10 +18,10 @@
     document.getElementById('sidebarMount').innerHTML=`<aside class="sidebar" id="sidebar" aria-label="Menu principal">
       <a href="salas.html" class="brand"><span class="brand-mark" aria-hidden="true">C</span><span>Campus<span class="flow">Flow</span></span></a>
       <p class="sidebar-caption">NAVEGAÇÃO</p><nav class="nav-list">${nav}</nav>
-      <div class="sidebar-bottom"><div class="sidebar-note"><strong>Reservas reais</strong><small>As reservas são registradas no MariaDB. E-mails e QR Codes serão adicionados na próxima integração.</small></div><a class="nav-link" href="../index.html" id="logoutLink"><span class="nav-symbol" aria-hidden="true">↪</span><span>Sair</span></a></div>
+      <div class="sidebar-bottom"><a class="nav-link" href="../index.html" id="logoutLink"><span class="nav-symbol" aria-hidden="true">↪</span><span>Sair</span></a></div>
     </aside><div class="sidebar-overlay" id="sidebarOverlay" hidden></div>`;
     document.getElementById('topbarMount').innerHTML=`<header class="topbar"><button class="icon-button menu-toggle" id="menuToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="sidebar">☰</button><div class="breadcrumb"><a href="salas.html">Início</a><span aria-hidden="true">/</span><strong>${safeText(titles[page]||'CampusFlow')}</strong></div><div class="topbar-actions"><div class="user-chip"><span class="avatar">${safeText(initials(nome))}</span><span><strong>${safeText(nome)}</strong><small>Sessão autenticada</small></span></div></div></header>`;
-    document.getElementById('footerMount').innerHTML=`<footer class="app-footer"><span>© ${new Date().getFullYear()} CampusFlow</span><span>API Node.js + MariaDB · reservas reais</span></footer>`;
+    document.getElementById('footerMount').innerHTML=`<footer class="app-footer"><span></span><span>© ${new Date().getFullYear()} CampusFlow</span></footer>`;
     const sidebar=document.getElementById('sidebar'),overlay=document.getElementById('sidebarOverlay'),toggle=document.getElementById('menuToggle');
     const close=()=>{sidebar.classList.remove('is-open');overlay.classList.remove('is-visible');overlay.hidden=true;toggle.setAttribute('aria-expanded','false');};
     toggle.addEventListener('click',()=>{if(sidebar.classList.contains('is-open'))close();else{sidebar.classList.add('is-open');overlay.hidden=false;overlay.classList.add('is-visible');toggle.setAttribute('aria-expanded','true');}});
