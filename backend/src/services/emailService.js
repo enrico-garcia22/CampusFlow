@@ -290,7 +290,7 @@ export function construirHtmlEmailConfirmacao({
 
       <div class="qr-section">
         <div class="qr-container">
-          ${qrSvg}
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(checkinUrl)}" alt="QR Code de Check-in" width="220" height="220" style="display:block;margin:0 auto;" />
         </div>
         <div class="qr-hint">
           <strong>Como validar a presença:</strong><br>
@@ -300,7 +300,7 @@ export function construirHtmlEmailConfirmacao({
           <a href="${checkinUrl}" class="btn-action" target="_blank" rel="noopener">Link Direto de Check-in</a>
         </div>
       </div>
-
+      
       <div class="alert">
         <strong>Importante:</strong> Para comprovar o uso efetivo da sala e evitar que a reserva seja marcada como <em>expirada</em> por falta de comparecimento, realize o check-in até 10 minutos após o início do horário.
       </div>
