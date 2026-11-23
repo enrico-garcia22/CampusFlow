@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.env
+**/.env.*
+**/outbox
+**/*.log
+**/*.bak
+**/.DS_Store
+**/coverage
+**/dist
+**/.vscode
