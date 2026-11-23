@@ -8,7 +8,8 @@
   const ambienteLocalHttp = window.location.protocol === 'http:' && (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
-    /^(192\\.168\\.|10\\.|172\\.(1[6-9]|2\\d|3[01])\\.)/.test(hostname)
+    hostname.startsWith('192.168.') || hostname.startsWith('10.') ||
+    (hostname.startsWith('172.') && Number(hostname.split('.')[1]) >= 16 && Number(hostname.split('.')[1]) <= 31)
   );
   const BASE = ambienteLocalHttp
     ? `http://${hostname === '127.0.0.1' ? 'localhost' : hostname}:3001/api`
