@@ -5,7 +5,7 @@
   function card(r){
     const e=safe(),estado=r.estado_agora==='em_uso'?'Em uso':r.estado_agora==='reservada'?'Reservada agora':'Livre agora';
     const badge=r.estado_agora==='livre'?'badge-green':'badge-neutral';
-    return `<article class="room-card"><div class="room-head"><span class="room-tag">Sala cadastrada</span><div class="room-name-row"><span class="room-symbol" aria-hidden="true">▤</span><div><h2>${e(r.nome)}</h2><div class="room-building">${e(r.predio)}</div></div></div>
+    return `<article class="room-card" tabindex="0" aria-label="${e(r.nome)}. Pressione Enter ou Espaço para expandir os detalhes."><div class="room-head"><span class="room-tag">Sala cadastrada</span><div class="room-name-row"><span class="room-symbol" aria-hidden="true">▤</span><div><h2>${e(r.nome)}</h2><div class="room-building">${e(r.predio)}</div></div></div>
     <p class="room-description">${e(r.descricao || 'Espaço universitário cadastrado no sistema.')}</p>
     <div class="room-metadata"><span>♙ ${Number(r.capacidade)} pessoas</span><span>◷ ${e(r.abre_as)} às ${e(r.fecha_as)}</span><span class="badge ${badge}">${estado}</span></div></div>
     <details class="room-details"><summary>Ver detalhes da sala</summary><div class="room-details-body"><div class="room-info-grid">
@@ -36,6 +36,21 @@
       count.textContent=`${filtered.length} ${filtered.length===1?'sala encontrada':'salas encontradas'}`;
       list.innerHTML=filtered.length?filtered.map(card).join(''):'<div class="empty-state full-grid"><h2>Nenhuma sala encontrada</h2><p>Altere a busca ou os filtros.</p></div>';
     }
+    // Todo o cartão abre/fecha os detalhes, sem interferir no summary ou no link Reservar.
+    function alternarDetalhes(event) {
+      const cartao = event.target.closest('.room-card');
+      if (!cartao || !list.contains(cartao)) return;
+      if (event.type === 'click') {
+        if (event.target.closest('a, button, summary, input, select, textarea, .room-details-body')) return;
+      } else {
+        if (event.target !== cartao || !['Enter', ' '].includes(event.key)) return;
+        event.preventDefault();
+      }
+      const detalhes = cartao.querySelector('.room-details');
+      if (detalhes) detalhes.open = !detalhes.open;
+    }
+    list.addEventListener('click', alternarDetalhes);
+    list.addEventListener('keydown', alternarDetalhes);
     function reset(){search.value='';building.value='';capacity.value='';render();}
     search.addEventListener('input',render);
     [building,capacity].forEach(el=>el.addEventListener('change',render));

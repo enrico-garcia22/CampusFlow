@@ -34,6 +34,7 @@ test('construirHtmlEmailConfirmacao gera HTML com dados da reserva e QR Code', (
   assert.ok(html.includes('Bloco A'));
   assert.ok(html.includes('12 participantes'));
   assert.ok(html.includes('<svg'));
+  assert.ok(!html.includes('api.qrserver.com'));
   assert.ok(html.includes(checkinUrl));
 });
 

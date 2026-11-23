@@ -11,21 +11,33 @@ export const app = express();
 app.disable('x-powered-by');
 
 // CORS flexível para suportar tanto localhost quanto acesso por celular na mesma rede local
+// Origens autorizadas para acessar a API
+const origensPermitidas = new Set(
+  (process.env.FRONTEND_ORIGIN || '')
+    .split(',')
+    .map((origem) => origem.trim())
+    .filter(Boolean)
+);
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Permite requisições sem origin (mobile apps, curl, etc.) ou qualquer origem local em desenvolvimento
-    if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('192.168.') || origin.includes('10.')) {
+    // Permite chamadas sem Origin, como curl e aplicativos locais.
+    if (!origin) {
       return callback(null, true);
     }
-    const configuredOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173').split(',');
-    if (configuredOrigins.includes(origin)) {
+
+    // Permite somente origens configuradas no .env.
+    if (origensPermitidas.has(origin)) {
       return callback(null, true);
     }
-    return callback(null, true); // Permite em desenvolvimento acadêmico
+
+    // Rejeita origens não autorizadas.
+    return callback(
+      new ErroHttp(403, 'Origem não permitida pelo CORS.')
+    );
   },
   credentials: true,
 }));
-
 app.use(express.json({ limit: '25kb' }));
 
 app.get('/api/health', async (_req, res) => {

@@ -8,10 +8,11 @@
   .room-details-body { padding-inline:17px; }
 }
 @media (max-width: 900px) {
-  .sidebar { transform:translateX(-100%); transition:transform .2s ease; }
+  .sidebar { width:min(290px, 85vw); transform:translateX(-100%); transition:transform .2s ease; }
   .sidebar.is-open { transform:translateX(0); }
   .sidebar-overlay.is-visible { display:block; position:fixed; z-index:30; inset:0; background:#0f172a88; }
   .app-main { margin-left:0; }
+  .app-footer { left:0; }
   .menu-toggle { display:grid; }
   .content-two { grid-template-columns:1fr; }
   .auth-page { grid-template-columns:.8fr 1.2fr; }
@@ -49,6 +50,8 @@
   .booking-toolbar .filters-mini > * { flex:1; }
   .booking-record { padding:16px; }
   .room-info-grid { grid-template-columns:1fr; }
+  :root { --footer-height:76px; }
+  .app-footer { flex-direction:column; justify-content:center; text-align:center; gap:3px; }
   .quick-item small { font-size:.67rem; }
 }
 @media (prefers-reduced-motion: reduce) {
