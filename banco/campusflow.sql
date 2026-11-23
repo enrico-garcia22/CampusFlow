@@ -71,6 +71,22 @@ CREATE TABLE IF NOT EXISTS checkins (
   CONSTRAINT fk_checkins_validador FOREIGN KEY (validado_por_usuario_id) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
 
+-- presencas: registra comparecimento de cada participante por reserva.
+-- usuario_id é NULL para alunos que validaram via câmera sem login.
+-- dispositivo_hash identifica o dispositivo para evitar duplicatas anônimas.
+CREATE TABLE IF NOT EXISTS presencas (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  reserva_id INT UNSIGNED NOT NULL,
+  usuario_id INT UNSIGNED NULL COMMENT 'NULL para participantes sem login',
+  dispositivo_hash VARCHAR(64) NULL COMMENT 'Hash de sessão do celular para anti-duplicata',
+  nome_informado VARCHAR(150) NULL COMMENT 'Nome digitado pelo participante anônimo',
+  registrado_em_utc DATETIME NOT NULL,
+  UNIQUE KEY uq_presencas_reserva_usuario (reserva_id, usuario_id),
+  KEY idx_presencas_reserva (reserva_id),
+  CONSTRAINT fk_presencas_reserva FOREIGN KEY (reserva_id) REFERENCES reservas(id),
+  CONSTRAINT fk_presencas_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+) ENGINE=InnoDB;
+
 -- Cinco salas de demonstração; substituíveis pelas salas reais posteriormente.
 INSERT IGNORE INTO salas (nome, predio, capacidade, abre_as, fecha_as, descricao) VALUES
   ('Sala 101', 'Bloco A', 15, '07:00:00', '22:00:00', 'Sala para grupos pequenos'),

@@ -3,49 +3,68 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="CampusFlow — gerenciamento acadêmico de salas com autenticação e consulta de salas reais.">
+  <meta name="description" content="CampusFlow — Sistema de Gestão e Reserva de Espaços Acadêmicos.">
   <meta name="theme-color" content="#172554">
+  <title>Entrar | CampusFlow</title>
   <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-  <title>Acessar | CampusFlow</title>
   <link rel="stylesheet" href="assets/css/variables.css">
   <link rel="stylesheet" href="assets/css/global.css">
   <link rel="stylesheet" href="assets/css/components.css">
   <link rel="stylesheet" href="assets/css/responsive.css">
   <script defer src="assets/js/api.js"></script>
-  <script defer src="assets/js/app.js"></script>
   <script defer src="assets/js/login.js"></script>
 </head>
 <body>
   <a href="#conteudo" class="skip-link">Pular para o conteúdo</a>
   <main class="auth-page" id="conteudo">
-    <section class="auth-aside" aria-labelledby="introTitle">
-      <a href="index.html" class="brand" aria-label="CampusFlow, início"><span class="brand-mark" aria-hidden="true">C</span><span>Campus<span class="flow">Flow</span></span></a>
-      <div class="auth-aside-inner"><span class="eyebrow">SUA JORNADA ACADÊMICA</span>
-        <h1 id="introTitle">Tudo conectado.<br>Seu campus em fluxo.</h1>
-        <p>Explore ambientes, consulte informações e organize reservas de espaços acadêmicos com praticidade.</p>
+    <section class="auth-aside" aria-labelledby="tituloLogin">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">C</span>
+        <span>Campus<span class="flow">Flow</span></span>
+      </a>
+      <div class="auth-aside-inner">
+        <span class="eyebrow">SISTEMAS COMPUTACIONAIS</span>
+        <h1 id="tituloLogin">Reserva inteligente de salas no campus.</h1>
+        <p>Acesse o catálogo de espaços, faça reservas com estimativa de alunos e valide presenças com QR Code em tempo real.</p>
+      </div>
+      <div class="auth-aside-foot">
+        Projeto Acadêmico &middot; Ambiente de Desenvolvimento
       </div>
     </section>
-    <section class="auth-content" aria-labelledby="loginTitle">
-      <div class="auth-form">
-        <a href="index.html" class="brand brand-on-white auth-mobile-brand" aria-label="CampusFlow, início"><span class="brand-mark" aria-hidden="true">C</span><span>Campus<span class="flow">Flow</span></span></a>
-        <span class="eyebrow">BEM-VINDO(A) DE VOLTA</span>
-        <h2 id="loginTitle">Acesse o CampusFlow</h2>
-        <p class="muted">Entre com seu nome de usuário e senha para acessar as salas cadastradas.</p>
-        <p id="successSignup" class="info-banner" hidden role="status">Cadastro criado com sucesso! Faça login para continuar.</p>
-        <form id="loginForm" class="form-grid">
-          <div class="field"><label for="username">Nome de usuário</label><input id="username" name="nome_usuario" type="text" placeholder="Nome de Usuário" autocomplete="username" required minlength="3" maxlength="30"></div>
+
+    <section class="auth-content" aria-labelledby="loginHeading">
+      <div class="auth-form" style="width: min(100%, 460px);">
+        <div id="successSignup" class="info-banner mb-18" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;" hidden>
+          <span class="banner-bubble" style="background:#16a34a;color:#fff;" aria-hidden="true">✓</span>
+          <p>Cadastro realizado com sucesso! Faça login com seu usuário e senha.</p>
+        </div>
+
+        <span class="eyebrow">ÁREA DO ALUNO & PROFESSOR</span>
+        <h2 id="loginHeading">Entrar no sistema</h2>
+        <p class="muted">Informe suas credenciais acadêmicas para continuar.</p>
+
+        <form id="loginForm" class="form-grid" autocomplete="on">
           <div class="field">
-            <label for="password">Senha</label>
-            <div class="password-field">
-              <input id="password" name="password" type="password" placeholder="Digite sua senha" autocomplete="current-password" required minlength="8">
-              <button type="button" class="password-toggle" id="togglePassword" aria-pressed="false" aria-label="Mostrar senha">Mostrar</button>
-            </div>
+            <label for="username">Nome de usuário ou RA</label>
+            <input id="username" type="text" autocomplete="username" placeholder="Ex: aluno_teste" required>
           </div>
+
+          <div class="field">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <label for="password">Senha</label>
+              <button type="button" id="togglePassword" class="btn btn-quiet btn-sm" aria-pressed="false" style="padding:2px 6px;font-size:12px;">Mostrar</button>
+            </div>
+            <input id="password" type="password" autocomplete="current-password" placeholder="Sua senha" required>
+          </div>
+
           <p class="form-error" id="loginError" role="alert"></p>
-          <button class="btn btn-primary btn-block" type="submit">Entrar <span aria-hidden="true">→</span></button>
+
+          <button class="btn btn-primary btn-block" type="submit">Entrar na conta &rarr;</button>
         </form>
-        <div class="divider"><span>ou</span></div>
-        <a class="btn btn-outline btn-block" href="pages/cadastro.html">Não está cadastrado? Registre-se agora</a>
+
+        <p class="auth-bottom" style="margin-top: 24px; text-align: center;">
+          Não tem uma conta? <a href="pages/cadastro.html">Cadastre-se aqui</a>
+        </p>
       </div>
     </section>
   </main>

@@ -5,3 +5,6 @@ node_modules/
 
 # Mapeamentos locais de RAs para migração
 ra-migracao*.json
+
+# E-mails gerados localmente pela automação
+outbox/

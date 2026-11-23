@@ -55,3 +55,16 @@ Authorization: Bearer {{token}}
 ### 8. Estatísticas (exige perfil admin)
 GET {{url}}/api/admin/estatisticas
 Authorization: Bearer {{token}}
+
+### 9. Obter QR Code e dados de presença da reserva (substitua 1 pelo ID da reserva)
+GET {{url}}/api/reservas/1/qrcode
+Authorization: Bearer {{token}}
+
+### 10. Validar presença por QR Code
+POST {{url}}/api/reservas/checkin
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "token": "COLE_O_TOKEN_DO_QR_CODE_AQUI"
+}
