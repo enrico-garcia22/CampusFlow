@@ -2,6 +2,7 @@ import { app } from './app.js';
 import { pool } from './config/db.js';
 import { atualizarStatusReservas, GRACE_SECONDS } from './services/statusReservas.js';
 import { validarConfiguracaoRa } from './utils/ra.js';
+import { inicializarBancoSeSolicitado } from './config/inicializarBanco.js';
 
 const segredo = process.env.JWT_SECRET || '';
 if (segredo.length < 32 || segredo.startsWith('SUBSTITUA_')) {
@@ -11,6 +12,7 @@ if (segredo.length < 32 || segredo.startsWith('SUBSTITUA_')) {
 
 try {
   validarConfiguracaoRa();
+  await inicializarBancoSeSolicitado();
   await pool.query('SELECT 1');
   await atualizarStatusReservas();
   const porta = Number(process.env.PORT || 3001);
