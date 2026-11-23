@@ -23,7 +23,11 @@ try {
   // Rotina local para transicionar status mesmo sem consultas à API.
   // A própria API também atualiza os status quando recebe consultas/reservas.
   // Na hospedagem, adicionar cron independente para não depender do processo ativo.
-  setInterval(() => atualizarStatusReservas().catch((e) => console.error('Falha em status:', e)), 15000).unref();
+  // Evita polling permanente no plano serverless. Em produção, as operações da
+  // API continuam atualizando os estados sob demanda.
+  if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_STATUS_TIMER === 'true') {
+    setInterval(() => atualizarStatusReservas().catch((e) => console.error('Falha em status:', e)), 15000).unref();
+  }
 } catch (erro) {
   console.error('Não foi possível conectar ao banco. Verifique XAMPP, importação SQL e .env.');
   console.error(erro.message);
