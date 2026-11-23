@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import { authRouter } from './rotas/auth.js';
 import { salasRouter } from './rotas/salas.js';
@@ -56,6 +58,12 @@ app.use('/api/checkin', (req, res, next) => {
 });
 
 app.use('/api/admin', adminRouter);
+
+// Frontend estático servido pela mesma origem HTTPS da API em produção.
+// A pasta fica fora do backend e é copiada junto com ele na imagem Docker.
+const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../frontend');
+app.use('/frontend', express.static(frontendDir, { dotfiles: 'deny', index: false }));
+app.get('/', (_req, res) => res.redirect('/frontend/index.html'));
 
 app.use((_req, _res, next) => next(new ErroHttp(404, 'Rota não encontrada.')));
 app.use((erro, _req, res, _next) => {
