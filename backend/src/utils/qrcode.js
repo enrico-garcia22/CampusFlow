@@ -14,9 +14,15 @@ export function gerarTokenQr() {
 /**
  * Gera um token unívoco e seguro para a reserva usando HMAC com o segredo do servidor.
  */
-export function gerarTokenReserva({ usuarioId, salaId, inicioUtc, fimUtc }) {
+export function gerarTokenReserva({ usuarioId, salaId, inicioUtc, fimUtc, reservaId = null }) {
   const secret = process.env.JWT_SECRET || 'campusflow_jwt_secret_dev_key_min_32';
-  const payload = `campusflow:reserva:${usuarioId}:${salaId}:${inicioUtc}:${fimUtc}`;
+  // O ID distingue uma nova reserva de outra cancelada para a mesma sala e horário.
+  // Sem ID, preservamos os tokens já emitidos antes desta correção.
+  const payloadBase = `campusflow:reserva:${usuarioId}:${salaId}:${inicioUtc}:${fimUtc}`;
+  if (reservaId !== null && (!Number.isSafeInteger(Number(reservaId)) || Number(reservaId) <= 0)) {
+    throw new Error('Identificador de reserva inválido para gerar QR Code.');
+  }
+  const payload = reservaId === null ? payloadBase : `${payloadBase}:id:${reservaId}`;
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }
 
