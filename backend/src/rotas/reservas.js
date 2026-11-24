@@ -283,12 +283,22 @@ reservasRouter.get('/:id/qrcode', exigirLogin, async (req, res) => {
 
   const totalPresentes = Number(presencas[0]?.total ?? 0);
 
-  const token = gerarTokenReserva({
+  // Novas reservas têm token vinculado ao ID. Reservas antigas mantêm o token
+  // original para que QR Codes já emitidos continuem válidos.
+  const dadosToken = {
     usuarioId: r.usuario_id,
     salaId: r.sala_id,
     inicioUtc: r.inicio_utc,
     fimUtc: r.fim_utc,
-  });
+  };
+  const tokenAtual = gerarTokenReserva({ ...dadosToken, reservaId: r.id });
+  const tokenLegado = gerarTokenReserva(dadosToken);
+  const token = hashTokenQr(tokenAtual) === r.qr_token_hash
+    ? tokenAtual
+    : hashTokenQr(tokenLegado) === r.qr_token_hash ? tokenLegado : null;
+  if (!token) {
+    throw new ErroHttp(500, 'Não foi possível recuperar o QR Code desta reserva.');
+  }
 
   const frontendBase = obterFrontendBase(req);
   const checkinUrl = `${frontendBase}/pages/checkin.html?token=${encodeURIComponent(token)}`;
@@ -351,23 +361,30 @@ reservasRouter.post('/', exigirLogin, async (req, res) => {
     const inicioUtcStr = paraSqlUtc(dataInicio);
     const fimUtcStr = paraSqlUtc(dataFim);
 
+    // qr_token_hash é nullable: primeiro reservamos o ID único no banco.
+    // Só então geramos o QR Code definitivo, incluindo esse ID no HMAC.
+    // Ambas as consultas ocorrem na mesma transação: nunca fica uma reserva
+    // confirmada sem o hash correspondente.
+    const [resultado] = await conexao.execute(`
+      INSERT INTO reservas (
+        usuario_id, sala_id, inicio_utc, fim_utc, qtd_pessoas,
+        responsavel_nome, responsavel_ra, responsavel_telefone,
+        titulo, descricao, nomes_participantes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [req.usuario.id, salaId, inicioUtcStr, fimUtcStr, pessoas,
+        req.usuario.nome_completo, req.usuario.ra_hash, req.usuario.telefone,
+        titulo, descricao, nomes]);
+
     const qrToken = gerarTokenReserva({
       usuarioId: req.usuario.id,
       salaId,
       inicioUtc: inicioUtcStr,
       fimUtc: fimUtcStr,
+      reservaId: resultado.insertId,
     });
-    const qrTokenHash = hashTokenQr(qrToken);
-
-    const [resultado] = await conexao.execute(`
-      INSERT INTO reservas (
-        usuario_id, sala_id, inicio_utc, fim_utc, qtd_pessoas,
-        responsavel_nome, responsavel_ra, responsavel_telefone,
-        titulo, descricao, nomes_participantes, qr_token_hash
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [req.usuario.id, salaId, inicioUtcStr, fimUtcStr, pessoas,
-        req.usuario.nome_completo, req.usuario.ra_hash, req.usuario.telefone,
-        titulo, descricao, nomes, qrTokenHash]);
+    await conexao.execute('UPDATE reservas SET qr_token_hash = ? WHERE id = ?', [
+      hashTokenQr(qrToken), resultado.insertId,
+    ]);
     await conexao.commit();
 
     const frontendBase = obterFrontendBase(req);
