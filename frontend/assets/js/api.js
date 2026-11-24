@@ -2,15 +2,18 @@
 (() => {
   'use strict';
 
-  // Se acessado pelo celular na rede local (ex: http://192.168.x.x), aponta a API para o mesmo IP na porta 3001
-  const isHostEspecifico = typeof window !== 'undefined' &&
-    window.location.hostname &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1';
-
-  const BASE = isHostEspecifico
-    ? `${window.location.protocol}//${window.location.hostname}:3001/api`
-    : 'http://localhost:3001/api';
+  // Em hospedagem HTTPS, usa a mesma origem do site (/api), sem portas expostas.
+  // No Live Server local, conserva a API na porta 3001 (inclusive no celular).
+  const hostname = window.location.hostname;
+  const ambienteLocalHttp = window.location.protocol === 'http:' && (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('192.168.') || hostname.startsWith('10.') ||
+    (hostname.startsWith('172.') && Number(hostname.split('.')[1]) >= 16 && Number(hostname.split('.')[1]) <= 31)
+  );
+  const BASE = ambienteLocalHttp
+    ? `http://${hostname === '127.0.0.1' ? 'localhost' : hostname}:3001/api`
+    : `${window.location.origin}/api`;
 
   const KEY = 'campusflow.api.session.v1';
 

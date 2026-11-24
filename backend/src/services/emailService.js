@@ -426,6 +426,45 @@ export async function notificarReservaCriada({
 
     console.log(`[Notificação] E-mail com QR Code gerado para Reserva #${reservaId}. Arquivo local: outbox/${nomeArquivoHtml}`);
 
+    // 2. Em produção, pode enviar por API HTTPS (Resend); em ambiente local, SMTP.
+    // Railways Free/Trial/Hobby bloqueiam SMTP de saída, mas permitem HTTPS.
+    const chaveResend = process.env.RESEND_API_KEY?.trim();
+    const assunto = `Confirmação de Reserva #${reservaId} (${sala.nome}) - CampusFlow`;
+
+    if (chaveResend && usuario.email) {
+      try {
+        const remetenteResend = process.env.RESEND_FROM?.trim();
+        if (!remetenteResend) throw new Error('Defina RESEND_FROM com remetente verificado no Resend.');
+        const resposta = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${chaveResend}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: remetenteResend,
+            to: [usuario.email],
+            subject: assunto,
+            html: htmlParaEmail,
+            attachments: [{
+              filename: 'qrcode.png',
+              content: qrPngBase64,
+              content_type: 'image/png',
+              content_id: 'qr-campusflow@campusflow.local',
+            }],
+          }),
+          signal: AbortSignal.timeout(20000),
+        });
+        if (!resposta.ok) {
+          throw new Error(`API de e-mail recusou o envio (HTTP ${resposta.status}).`);
+        }
+        console.log(`[Notificação] E-mail aceito pela API HTTPS para Reserva #${reservaId}.`);
+      } catch (erroEnvio) {
+        console.error('[Notificação] Falha ao enviar e-mail pela API HTTPS:', erroEnvio.message);
+      }
+      return { sucesso: true, outboxPath: caminhoHtml, checkinUrl };
+    }
+
     // 2. Envio REAL por SMTP caso configurado no .env
     const smtpHost = process.env.SMTP_HOST;
     const smtpUser = process.env.SMTP_USER;
